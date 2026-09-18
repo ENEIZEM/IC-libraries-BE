@@ -29,7 +29,7 @@ let SimpleMenu = {
             return "name";
         }
         // HEX: #RGB или #RRGGBB
-        if (typeof color === "string" && /^#([0-9A-F]{3}|[0-9A-F]{6})$/i.test(color)) {
+        if (typeof color === "string" && /^#([0-9A-F]{3,4}|[0-9A-F]{6}|[0-9A-F]{8})$/i.test(color)) {
             return "hex";
         }
         // RGB: массив из 3 чисел 0–255
@@ -43,7 +43,6 @@ let SimpleMenu = {
         return null;
     },
 
-    // Удобная обёртка (необязательная)
     isColor: function(color) {
         return !!this.getColorType(color);
     },
@@ -51,13 +50,13 @@ let SimpleMenu = {
     ConvertColor: function(color, finalType) {
         var colorType = this.getColorType(color);
         if (colorType === null) {
-            throw new Error("ConvertColor: invalid color value");
+            Logger.Log("[SimpleMenuAPI] ConvertColor: invalid color value", "ERROR");
         }
         if (typeof finalType === "undefined") {
-            throw new Error('ConvertColor: missing required parameter "finalType". Allowed values: "rgb", "hex", "name"');
+            Logger.Log('[SimpleMenuAPI] ConvertColor: missing required parameter "finalType". Allowed values: "rgb", "hex", "name"', "ERROR");
         }
         if (["rgb", "hex", "name"].indexOf(finalType) === -1) {
-            throw new Error('ConvertColor: invalid finalType "' + finalType + '". Allowed values: "rgb", "hex", "name"');
+            Logger.Log('[SimpleMenuAPI] ConvertColor: invalid finalType "' + finalType + '". Allowed values: "rgb", "hex", "name"', "ERROR");
         }
         // Тот же формат — возвращаем как есть
         if (colorType === finalType) {
@@ -182,172 +181,250 @@ let SimpleMenu = {
         // ------------------------------------------------------------------------
         // ЭЛЕМЕНТЫ МЕНЮ
         // ------------------------------------------------------------------------
-        button: {
-            type:            { type: "string" },
-            name:            { type: "string" },
-            buttonText:      { type: "string" },
-            onButtonClick:   { type: "function", default: null },
-            nameSize:        { type: "number",   default: "drawing.nameSize" },
-            nameColor:       { type: "color",    default: "drawing.nameColor" },
-            buttonTextSize:  { type: "number",   default: "drawing.buttonTextSize" },
-            buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
-            enableScrolling: { type: "boolean",  default: true },
-            hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
-        },
+        elements: {
+            type: "array",
+            default: null,
+            properties: {
+                button: {
+                    type:            { type: "string" },
+                    name:            { type: "string" },
+                    buttonText:      { type: "string" },
+                    onButtonClick:   { type: "function", default: null },
+                    nameSize:        { type: "number",   default: "drawing.nameSize" },
+                    nameColor:       { type: "color",    default: "drawing.nameColor" },
+                    buttonTextSize:  { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
+                    enableScrolling: { type: "boolean",  default: true },
+                    hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
 
-        switch: {
-            type:       { type: "string" },
-            name:       { type: "string" },
-            onSwitched: { type: "function", default: null },
-            nameSize:   { type: "number",   default: "drawing.nameSize" },
-            nameColor:  { type: "color",    default: "drawing.nameColor" },
-            state:      { type: "boolean",  default: false },
-            hint:       { $ref: "SUB_SCHEMAS.hint", default: null }
-        },
+                switch: {
+                    type:       { type: "string" },
+                    name:       { type: "string" },
+                    onSwitched: { type: "function", default: null },
+                    nameSize:   { type: "number",   default: "drawing.nameSize" },
+                    nameColor:  { type: "color",    default: "drawing.nameColor" },
+                    state:      { type: "boolean",  default: false },
+                    hint:       { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
 
-        checkbox: {
-            type:      { type: "string" },
-            name:      { type: "string" },
-            onChecked: { type: "function", default: null },
-            nameSize:  { type: "number",   default: "drawing.nameSize" },
-            nameColor: { type: "color",    default: "drawing.nameColor" },
-            state:     { type: "boolean",  default: false },
-            hint:      { $ref: "SUB_SCHEMAS.hint", default: null }
-        },
+                checkbox: {
+                    type:      { type: "string" },
+                    name:      { type: "string" },
+                    onChecked: { type: "function", default: null },
+                    nameSize:  { type: "number",   default: "drawing.nameSize" },
+                    nameColor: { type: "color",    default: "drawing.nameColor" },
+                    state:     { type: "boolean",  default: false },
+                    hint:      { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
 
-        edittext: {
-            type:                       { type: "string" },
-            name:                       { type: "string" },
-            buttonText:                 { type: "string" },
-            nameSize:                   { type: "number",   default: "drawing.nameSize" },
-            nameColor:                  { type: "color",    default: "drawing.nameColor" },
-            buttonTextSize:             { type: "number",   default: "drawing.buttonTextSize" },
-            buttonTextColor:            { type: "color",    default: "drawing.buttonTextColor" },
-            buttonTextChangeToEditText: { type: "boolean",  default: true },
-            edittextHint:               { type: "string",   default: "" },
-            edittextCurrent:            { type: "string",   default: "" },
-            edittextLinesCount:         { type: "number",   default: 1 },
-            onButtonClick:              { type: "function", default: null },
-            beforeTextChanged:          { type: "function", default: null },
-            onTextChanged:              { type: "function", default: null },
-            afterTextChanged:           { type: "function", default: null },
-            hint:                       { $ref: "SUB_SCHEMAS.hint", default: null }
-        },
+                edittext: {
+                    type:                       { type: "string" },
+                    name:                       { type: "string" },
+                    buttonText:                 { type: "string" },
+                    nameSize:                   { type: "number",   default: "drawing.nameSize" },
+                    nameColor:                  { type: "color",    default: "drawing.nameColor" },
+                    buttonTextSize:             { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextColor:            { type: "color",    default: "drawing.buttonTextColor" },
+                    buttonTextChangeToEditText: { type: "boolean",  default: true },
+                    edittextHint:               { type: "string",   default: "" },
+                    edittextCurrent:            { type: "string",   default: "" },
+                    edittextLinesCount:         { type: "number",   default: 1 },
+                    onButtonClick:              { type: "function", default: null },
+                    beforeTextChanged:          { type: "function", default: null },
+                    onTextChanged:              { type: "function", default: null },
+                    afterTextChanged:           { type: "function", default: null },
+                    hint:                       { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
 
-        seekbar: {
-            type:       { type: "string" },
-            name:       { type: "string" },
-            buttonText: { type: "string" },
-            seekbarDialog: {
-                type: "object",
-                properties: {
-                    min:            { type: "number" },
-                    max:            { type: "number" },
-                    step:           { type: "number", default: 1 },
-                    current:        { type: "number", default: 0 },
-                    positiveButton: { type: "string", default: "OK" },
-                    negativeButton: { type: "string", default: "Cancel" }
+                seekbar: {
+                    type:       { type: "string" },
+                    name:       { type: "string" },
+                    buttonText: { type: "string" },
+                    seekbarDialog: {
+                        type: "object",
+                        properties: {
+                            min:            { type: "number" },
+                            max:            { type: "number" },
+                            step:           { type: "number", default: 1 },
+                            current:        { type: "number", default: 0 },
+                            positiveButton: { type: "string", default: "OK" },
+                            negativeButton: { type: "string", default: "Cancel" }
+                        }
+                    },
+                    nameSize:                       { type: "number",   default: "drawing.nameSize" },
+                    nameColor:                      { type: "color",    default: "drawing.nameColor" },
+                    buttonTextSize:                 { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextColor:                { type: "color",    default: "drawing.buttonTextColor" },
+                    buttonTextChangeToSeekBarState: { type: "boolean",  default: true },
+                    onButtonClick:                  { type: "function", default: null },
+                    beforeProgressChanged:          { type: "function", default: null },
+                    onProgressChanged:              { type: "function", default: null },
+                    afterProgressChanged:           { type: "function", default: null },
+                    hint:                           { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                selection: {
+                    type:             { type: "string" },
+                    name:             { type: "string" },
+                    data:             { type: "array" },
+                    nameSize:         { type: "number",   default: "drawing.nameSize" },
+                    nameColor:        { type: "color",    default: "drawing.nameColor" },
+                    buttonTextSize:   { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextColor:  { type: "color",    default: "drawing.buttonTextColor" },
+                    selectionDefault: { type: "number",   default: 0 },
+                    selectionCurrent: { type: "number",   default: 0 },
+                    onButtonClick:    { type: "function", default: null },
+                    onSelect:         { type: "function", default: null },
+                    hint:             { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                multiselection: {
+                    type:            { type: "string" },
+                    name:            { type: "string" },
+                    buttonText:      { type: "string" },
+                    data:            { type: "array" },
+                    nameSize:        { type: "number",   default: "drawing.nameSize" },
+                    nameColor:       { type: "color",    default: "drawing.nameColor" },
+                    buttonTextSize:  { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
+                    onButtonClick:   { type: "function", default: null },
+                    onSelect:        { type: "function", default: null },
+                    hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                divider: {
+                    type:                       { type: "string" },
+                    name:                       { type: "string", default: "" },
+                    nameSize:                   { type: "number", default: "drawing.nameSize" },
+                    nameColor:                  { type: "color",  default: "drawing.nameColor" },
+                    separatorGradientDirection: { type: "number", default: "drawing.separatorGradientDirection" },
+                    separatorColor:             { type: "array",  default: "drawing.separatorColor" },
+                    separatorHeight:            { type: "number", default: "drawing.separatorHeight" }
                 }
-            },
-            nameSize:                       { type: "number",   default: "drawing.nameSize" },
-            nameColor:                      { type: "color",    default: "drawing.nameColor" },
-            buttonTextSize:                 { type: "number",   default: "drawing.buttonTextSize" },
-            buttonTextColor:                { type: "color",    default: "drawing.buttonTextColor" },
-            buttonTextChangeToSeekBarState: { type: "boolean",  default: true },
-            onButtonClick:                  { type: "function", default: null },
-            beforeProgressChanged:          { type: "function", default: null },
-            onProgressChanged:              { type: "function", default: null },
-            afterProgressChanged:           { type: "function", default: null },
-            hint:                           { $ref: "SUB_SCHEMAS.hint", default: null }
-        },
-
-        selection: {
-            type:             { type: "string" },
-            name:             { type: "string" },
-            data:             { type: "array" },
-            nameSize:         { type: "number",   default: "drawing.nameSize" },
-            nameColor:        { type: "color",    default: "drawing.nameColor" },
-            buttonTextSize:   { type: "number",   default: "drawing.buttonTextSize" },
-            buttonTextColor:  { type: "color",    default: "drawing.buttonTextColor" },
-            selectionDefault: { type: "number",   default: 0 },
-            selectionCurrent: { type: "number",   default: 0 },
-            onButtonClick:    { type: "function", default: null },
-            onSelect:         { type: "function", default: null },
-            hint:             { $ref: "SUB_SCHEMAS.hint", default: null }
-        },
-
-        multiselection: {
-            type:            { type: "string" },
-            name:            { type: "string" },
-            buttonText:      { type: "string" },
-            data:            { type: "array" },
-            nameSize:        { type: "number",   default: "drawing.nameSize" },
-            nameColor:       { type: "color",    default: "drawing.nameColor" },
-            buttonTextSize:  { type: "number",   default: "drawing.buttonTextSize" },
-            buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
-            onButtonClick:   { type: "function", default: null },
-            onSelect:        { type: "function", default: null },
-            hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
-        },
-
-        divider: {
-            type:                       { type: "string" },
-            name:                       { type: "string", default: "" },
-            nameSize:                   { type: "number", default: "drawing.nameSize" },
-            nameColor:                  { type: "color",  default: "drawing.nameColor" },
-            separatorGradientDirection: { type: "number", default: "drawing.separatorGradientDirection" },
-            separatorColor:             { type: "array",  default: "drawing.separatorColor" },
-            separatorHeight:            { type: "number", default: "drawing.separatorHeight" }
+            }
         }
     },
 
-    //the function of creating a new menu
-    Create: function(object) {
+Create: function(userConfig) {
+        userConfig = userConfig || {};
 
-        //возможные шаблоны ошибок
-        //у элемента №{index} отсутствует свойство 'type' или 'type' не string
-        //отсутствует обязательный параметр '{param}' у элемента '{typeElement}' под номером №{index} или '{param}' не {typeof}
-        //параметр '{param}' элемента '{typeElement}' под номером №{index} не правильный формат. необходим {typeof}
-        //неизвестная ошибка
+        //Валдация
+        function checkType(value, expectedType) {
+            if (expectedType === "array") return Array.isArray(value);
+            if (expectedType === "color") return SimpleMenu.isColor(value);
+            if (expectedType === "function") return typeof value === "function";
+            return typeof value === expectedType;
+        }
 
-        //функция шаблона ошибки
-        function err(functionName, message, elementIndex) {
-            var fullMessage = "[SIMPLEMENUAPI] " + functionName + ": " + message;
-            if (typeof elementIndex === "number") {
-                fullMessage += " (element #" + elementIndex + ")";
+        function resolveRef(globalSchema, refPath) {
+            if (!refPath || typeof refPath !== "string") return null;
+            var parts = refPath.split(".");
+            var current = globalSchema;
+            for (var i = 0; i < parts.length; i++) {
+                if (current && current[parts[i]] !== undefined) {
+                    current = current[parts[i]];
+                } else return null;
             }
-            throw new Error(fullMessage);
-        };
+            return current;
+        }
 
-
-        //валидатор
-         for (key in object.elements) {
-            let element = object.elements[key];
-            let index = parseInt(key, 10) + 1;
-            switch (element.type) {
-                case "button":
-                    break;
-                case "switch":
-                    break;
-                case "checkbox":
-                    break;
-                case "edittext":
-                    break;
-                case "seekbar":
-                    break;
-                case "selection":
-                    break;
-                case "multiselection":
-                    break;
-                case "divider":
-                    break;
-                default:
-                    throw new Error(
-                        "Error!\nUnknown element type «" + element.type + "» " +
-                        "at element №" + index
-                    );
+        // Выносим получение дефолтного значения в отдельную функцию
+        function resolveDefault(defaultValue, parsedConfig) {
+            if (typeof defaultValue === "string" && defaultValue.indexOf("drawing.") === 0) {
+                var propName = defaultValue.split(".")[1];
+                var drawing = parsedConfig.drawing || {};
+                return (drawing[propName] !== undefined) ? drawing[propName] : null;
             }
-         }
+            return defaultValue;
+        }
+
+        function validateSection(sectionName, userSection, schemaSection, parsedConfig, globalSchema) {
+            userSection = userSection || {};
+            var result = {};
+            
+            if (schemaSection && schemaSection.$ref) {
+                schemaSection = resolveRef(globalSchema, schemaSection.$ref);
+            }
+            
+            var properties = (schemaSection && schemaSection.properties) ? schemaSection.properties : schemaSection;
+            
+            for (var key in properties) {
+                var rules = properties[key];
+                if (rules && rules.$ref) {
+                    var refRules = resolveRef(globalSchema, rules.$ref);
+                    if (refRules) rules = refRules;
+                }
+                
+                var userValue = userSection[key];
+
+                if (rules.type === "object" && (rules.properties || rules.$ref)) {
+                    if ((userValue === undefined || userValue === null) && rules.default === null) {
+                        result[key] = null;
+                    } else {
+                        result[key] = validateSection(sectionName + "." + key, userValue, rules, parsedConfig, globalSchema);
+                    }
+                    continue;
+                }
+
+                if (userValue === undefined || userValue === null) {
+                    if (rules.default === undefined) {
+                        Logger.Log("[SimpleMenuAPI] Create: Missing required parameter '" + key + "' in '" + sectionName + "'!", "ERROR");
+                        result[key] = null;
+                    } else {
+                        // Используем хелпер для парсинга
+                        result[key] = resolveDefault(rules.default, parsedConfig);
+                    }
+                } else {
+                    if (rules.type && !checkType(userValue, rules.type)) {
+                        Logger.Log("[SimpleMenuAPI] Create: Parameter '" + key + "' in '" + sectionName + "' expected type '" + rules.type + "', but got '" + typeof userValue + "'", "ERROR");
+                        // Если тип не совпал, тоже прогоняем дефолт через хелпер
+                        result[key] = resolveDefault(rules.default, parsedConfig);
+                    } else {
+                        result[key] = userValue;
+                    }
+                }
+            }
+
+            for (var userKey in userSection) {
+                if (!properties[userKey]) {
+                    Logger.Log("[SimpleMenuAPI] Create: Unknown parameter '" + userKey + "' in '" + sectionName + "'", "WARNING"); // Лучше WARNING, чтобы не пугать
+                }
+            }
+            return result;
+        }
+
+        function validateElements(userElements, globalSchema, parsedConfig) {
+            if (!userElements || !Array.isArray(userElements)) return [];
+            var validatedList = [];
+            var elementsSchema = globalSchema.elements.properties;
+            
+            for (var i = 0; i < userElements.length; i++) {
+                var item = userElements[i];
+                var itemType = item.type;
+                if (!itemType || !elementsSchema[itemType]) {
+                    Logger.Log("[SimpleMenuAPI] Create: Element at index " + i + " has missing or unknown type '" + itemType + "'", "ERROR");
+                    continue;
+                }
+                var validItem = validateSection(
+                    "elements[" + i + "] (" + itemType + ")", 
+                    item, 
+                    elementsSchema[itemType], 
+                    parsedConfig, 
+                    globalSchema
+                );
+                validatedList.push(validItem);
+            }
+            return validatedList;
+        }
+
+        let config = {};
+        // ВАЖНО: Сначала валидируем drawing, чтобы заполнить стандартные значения
+        // Передаем собираемый config, а не userConfig
+        config.drawing = validateSection("drawing", userConfig.drawing, this.SCHEMA.drawing, config, this.SCHEMA);
+        // Теперь валидируем остальное. Они смогут безопасно ссылаться на готовые значения в config.drawing
+        config.menu = validateSection("menu", userConfig.menu, this.SCHEMA.menu, config, this.SCHEMA);
+        config.elements = validateElements(userConfig.elements, this.SCHEMA, config);
 
         //сокращения
         let AlertDialog = android.app.AlertDialog;
@@ -368,24 +445,14 @@ let SimpleMenu = {
         let Runnable = java.lang.Runnable;
         let ScrollView = android.widget.ScrollView;
         let SeekBar = android.widget.SeekBar;
-        let Spannable = android.text.Spannable;
         let Switch = android.widget.Switch;
         let TextView = android.widget.TextView;
         let TextWatcher = android.text.TextWatcher;
         let Typeface = android.graphics.Typeface;
-        let Throwable = java.lang.Throwable;
         let ViewGroup = android.view.ViewGroup;
-        let Resources = android.content.res.Resources;
         let TypedValue = android.util.TypedValue;
         let Context = android.content.Context;
-        let MarginLayoutParams = android.view.ViewGroup.MarginLayoutParams;
-        let ListView = android.widget.ListView;
-        let BaseAdapter = android.widget.BaseAdapter;
-        let ArrayAdapter = android.widget.ArrayAdapter;
-        let Base64 = android.util.Base64;
-        let ZipFile = java.util.zip.ZipFile;
         let Build = android.os.Build;
-        let InputType = android.text.InputType;
         let TextUtils = android.text.TextUtils;
         let ctx = UI.getContext(); //Контекст интерфейса
 
@@ -914,7 +981,7 @@ let SimpleMenu = {
 
         this.show = function() {
             ctx.runOnUiThread(//Запуск в потоке интерфейса
-                new java.lang.Runnable({
+                new Runnable({
                     run: function() {
                         try {
                             //Создание корневых элементов
