@@ -114,7 +114,7 @@ let SimpleMenu = {
         // ------------------------------------------------------------------------
         menu: {
             title:          { type: "string" },
-            titleSize:      { type: "number",  default: 20 },
+            titleSize:      { type: "number or string",  default: 20 },
             titleColor:     { type: "color",   default: "drawing.nameColor" },
             isCancelable:   { type: "boolean", default: true },
             
@@ -147,12 +147,12 @@ let SimpleMenu = {
         drawing: {
             menuStyle:                  { type: "number", default: android.R.style.Theme_Material_Dialog_Alert },
             animation:                  { type: "number", default: android.R.anim.slide_out_right },
-            nameSize:                   { type: "number", default: 16 },
+            nameSize:                   { type: "number or string", default: 16 },
             nameColor:                  { type: "color",  default: null},
-            buttonTextSize:             { type: "number", default: 16 },
+            buttonTextSize:             { type: "number or string", default: 16 },
             buttonTextColor:            { type: "color",  default: null},
-            separatorColor:             { type: "array",  default: [android.graphics.Color.WHITE] },
-            separatorHeight:            { type: "number", default: 3 },
+            separatorColor:             { type: "color[]",  default: [android.graphics.Color.WHITE] },
+            separatorHeight:            { type: "number or string", default: 3 },
             separatorGradientDirection: { type: "number", default: android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT }
         },
 
@@ -166,13 +166,13 @@ let SimpleMenu = {
                 properties: {
                     text:        { type: "string" },
                     textColor:   { type: "color",   default: "drawing.nameColor" },
-                    textSize:    { type: "number",  default: "drawing.nameSize" },
+                    textSize:    { type: "number or string",  default: "drawing.nameSize" },
                     buttonText:  { type: "string",  default: "OK" },
                     buttonTextColor: { type: "color",   default: "drawing.buttonTextColor" },
-                    buttonTextSize:  { type: "number",  default: "drawing.buttonTextSize" },
+                    buttonTextSize:  { type: "number or string",  default: "drawing.buttonTextSize" },
                     symbol:      { type: "string",  default: "ⓘ" },
                     symbolColor: { type: "color",   default: "drawing.nameColor" },
-                    symbolSize:  { type: "number",  default: "drawing.nameSize" },
+                    symbolSize:  { type: "number or string",  default: "drawing.nameSize" },
                     isClosable:  { type: "boolean", default: true }
                 }
             }
@@ -190,9 +190,9 @@ let SimpleMenu = {
                     name:            { type: "string" },
                     buttonText:      { type: "string" },
                     onButtonClick:   { type: "function", default: null },
-                    nameSize:        { type: "number",   default: "drawing.nameSize" },
+                    nameSize:        { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:       { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:  { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextSize:  { type: "number or string",   default: "drawing.buttonTextSize" },
                     buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
                     enableScrolling: { type: "boolean",  default: true },
                     hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
@@ -202,7 +202,7 @@ let SimpleMenu = {
                     type:       { type: "string" },
                     name:       { type: "string" },
                     onSwitched: { type: "function", default: null },
-                    nameSize:   { type: "number",   default: "drawing.nameSize" },
+                    nameSize:   { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:  { type: "color",    default: "drawing.nameColor" },
                     state:      { type: "boolean",  default: false },
                     hint:       { $ref: "SUB_SCHEMAS.hint", default: null }
@@ -212,7 +212,7 @@ let SimpleMenu = {
                     type:      { type: "string" },
                     name:      { type: "string" },
                     onChecked: { type: "function", default: null },
-                    nameSize:  { type: "number",   default: "drawing.nameSize" },
+                    nameSize:  { type: "number or string",   default: "drawing.nameSize" },
                     nameColor: { type: "color",    default: "drawing.nameColor" },
                     state:     { type: "boolean",  default: false },
                     hint:      { $ref: "SUB_SCHEMAS.hint", default: null }
@@ -222,14 +222,14 @@ let SimpleMenu = {
                     type:                       { type: "string" },
                     name:                       { type: "string" },
                     buttonText:                 { type: "string" },
-                    nameSize:                   { type: "number",   default: "drawing.nameSize" },
+                    nameSize:                   { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:                  { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:             { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextSize:             { type: "number or string",   default: "drawing.buttonTextSize" },
                     buttonTextColor:            { type: "color",    default: "drawing.buttonTextColor" },
                     buttonTextChangeToEditText: { type: "boolean",  default: true },
                     edittextHint:               { type: "string",   default: "" },
                     edittextCurrent:            { type: "string",   default: "" },
-                    edittextLinesCount:         { type: "number",   default: 1 },
+                    edittextLinesCount:         { type: "number or string",   default: 1 },
                     onButtonClick:              { type: "function", default: null },
                     beforeTextChanged:          { type: "function", default: null },
                     onTextChanged:              { type: "function", default: null },
@@ -244,17 +244,17 @@ let SimpleMenu = {
                     seekbarDialog: {
                         type: "object",
                         properties: {
-                            min:            { type: "number" },
-                            max:            { type: "number" },
-                            step:           { type: "number", default: 1 },
-                            current:        { type: "number", default: 0 },
+                            min:            { type: "number or string" },
+                            max:            { type: "number or string" },
+                            step:           { type: "number or string", default: 1 },
+                            current:        { type: "number or string", default: 0 },
                             positiveButton: { type: "string", default: "OK" },
                             negativeButton: { type: "string", default: "Cancel" }
                         }
                     },
-                    nameSize:                       { type: "number",   default: "drawing.nameSize" },
+                    nameSize:                       { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:                      { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:                 { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextSize:                 { type: "number or string",   default: "drawing.buttonTextSize" },
                     buttonTextColor:                { type: "color",    default: "drawing.buttonTextColor" },
                     buttonTextChangeToSeekBarState: { type: "boolean",  default: true },
                     onButtonClick:                  { type: "function", default: null },
@@ -268,12 +268,12 @@ let SimpleMenu = {
                     type:             { type: "string" },
                     name:             { type: "string" },
                     data:             { type: "array" },
-                    nameSize:         { type: "number",   default: "drawing.nameSize" },
+                    nameSize:         { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:        { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:   { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextSize:   { type: "number or string",   default: "drawing.buttonTextSize" },
                     buttonTextColor:  { type: "color",    default: "drawing.buttonTextColor" },
-                    selectionDefault: { type: "number",   default: 0 },
-                    selectionCurrent: { type: "number",   default: 0 },
+                    selectionDefault: { type: "number or string",   default: 0 },
+                    selectionCurrent: { type: "number or string",   default: 0 },
                     onButtonClick:    { type: "function", default: null },
                     onSelect:         { type: "function", default: null },
                     hint:             { $ref: "SUB_SCHEMAS.hint", default: null }
@@ -283,10 +283,10 @@ let SimpleMenu = {
                     type:            { type: "string" },
                     name:            { type: "string" },
                     buttonText:      { type: "string" },
-                    data:            { type: "array" },
-                    nameSize:        { type: "number",   default: "drawing.nameSize" },
+                    data:            { type: "array[]" },
+                    nameSize:        { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:       { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:  { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextSize:  { type: "number or string",   default: "drawing.buttonTextSize" },
                     buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
                     onButtonClick:   { type: "function", default: null },
                     onSelect:        { type: "function", default: null },
@@ -295,12 +295,12 @@ let SimpleMenu = {
 
                 divider: {
                     type:                       { type: "string" },
-                    name:                       { type: "string", default: "" },
-                    nameSize:                   { type: "number", default: "drawing.nameSize" },
+                    name:                       { type: "string", default: null },
+                    nameSize:                   { type: "number or string", default: "drawing.nameSize" },
                     nameColor:                  { type: "color",  default: "drawing.nameColor" },
                     separatorGradientDirection: { type: "number", default: "drawing.separatorGradientDirection" },
-                    separatorColor:             { type: "array",  default: "drawing.separatorColor" },
-                    separatorHeight:            { type: "number", default: "drawing.separatorHeight" }
+                    separatorColor:             { type: "color[]",  default: "drawing.separatorColor" },
+                    separatorHeight:            { type: "number or string", default: "drawing.separatorHeight" }
                 }
             }
         }
@@ -309,12 +309,95 @@ let SimpleMenu = {
 Create: function(userConfig) {
         userConfig = userConfig || {};
 
+        //Перевод dp в px
+        function dpToPx(dp) {
+            let dm = ctx.getResources().getDisplayMetrics();
+            return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, dm);
+        };
+
         //Валдация
+        // 1. Проверка типов
         function checkType(value, expectedType) {
             if (expectedType === "array") return Array.isArray(value);
             if (expectedType === "color") return SimpleMenu.isColor(value);
             if (expectedType === "function") return typeof value === "function";
+            if (expectedType === "number or string") {
+                if (typeof value === "number") return Number.isFinite(value);
+                if (typeof value === "string") {
+                    var t = value.trim();
+                    return t !== "" && Number.isFinite(Number(t));
+                }
+                return false;
+            }
+            if (expectedType === "array[]") return Array.isArray(value) && value.every(Array.isArray);
+            if (expectedType === "color[]") {
+                // Разрешаем передать как массив цветов, так и одиночный цвет
+                return SimpleMenu.isColor(value) || (Array.isArray(value) && value.every(SimpleMenu.isColor));
+            }
             return typeof value === expectedType;
+        }
+
+        // 2. Преобразование и нормализация значений по типу
+        function normalizeValue(value, expectedType) {
+            if (value === null || value === undefined) return value;
+
+            // Приведение строки/числа к чистому Number
+            if (expectedType === "number or string") {
+                return Number(value);
+            }
+
+            // Нормализация одиночного цвета
+            if (expectedType === "color") {
+                return SimpleMenu.ConvertColor(value, "name");
+            }
+
+            // Одиночный цвет превращаем в массив [color] и конвертируем все цвета в массиве
+            if (expectedType === "color[]") {
+                var rawArray = Array.isArray(value) ? value : [value];
+                var normalizedColors = [];
+                for (var i = 0; i < rawArray.length; i++) {
+                    normalizedColors.push(SimpleMenu.ConvertColor(rawArray[i], "name"));
+                }
+                return normalizedColors;
+            }
+
+            return value;
+        }
+
+        // 3. Логическая валидация элементов (seekbar и др.)
+        function sanitizeElementLogic(element, index) {
+            if (!element) return element;
+
+            if (element.type === "seekbar") {
+                var min = element.min;
+                var max = element.max;
+                var current = element.current;
+
+                // Если min больше max — меняем их местами
+                if (min > max) {
+                    Logger.Log("[SimpleMenuAPI] Create: elements[" + index + "] (seekbar) 'min' (" + min + ") > 'max' (" + max + "). Swapping values.", "WARNING");
+                    element.min = max;
+                    element.max = min;
+                    min = element.min;
+                    max = element.max;
+                }
+
+                // Подгоняем current под границы [min, max]
+                if (current < min) {
+                    Logger.Log("[SimpleMenuAPI] Create: elements[" + index + "] (seekbar) 'current' (" + current + ") is lower than 'min' (" + min + "). Set to min.", "WARNING");
+                    element.current = min;
+                } else if (current > max) {
+                    Logger.Log("[SimpleMenuAPI] Create: elements[" + index + "] (seekbar) 'current' (" + current + ") is higher than 'max' (" + max + "). Set to max.", "WARNING");
+                    element.current = max;
+                }
+            }
+
+            // Преобразование dp в px
+            if(element.type == 'divider'){
+                element.separatorHeight = dpToPx(element.separatorHeight);
+            }
+
+            return element;
         }
 
         function resolveRef(globalSchema, refPath) {
@@ -329,7 +412,6 @@ Create: function(userConfig) {
             return current;
         }
 
-        // Выносим получение дефолтного значения в отдельную функцию
         function resolveDefault(defaultValue, parsedConfig) {
             if (typeof defaultValue === "string" && defaultValue.indexOf("drawing.") === 0) {
                 var propName = defaultValue.split(".")[1];
@@ -367,28 +449,30 @@ Create: function(userConfig) {
                     continue;
                 }
 
+                var rawValue;
                 if (userValue === undefined || userValue === null) {
                     if (rules.default === undefined) {
                         Logger.Log("[SimpleMenuAPI] Create: Missing required parameter '" + key + "' in '" + sectionName + "'!", "ERROR");
-                        result[key] = null;
+                        rawValue = null;
                     } else {
-                        // Используем хелпер для парсинга
-                        result[key] = resolveDefault(rules.default, parsedConfig);
+                        rawValue = resolveDefault(rules.default, parsedConfig);
                     }
                 } else {
                     if (rules.type && !checkType(userValue, rules.type)) {
                         Logger.Log("[SimpleMenuAPI] Create: Parameter '" + key + "' in '" + sectionName + "' expected type '" + rules.type + "', but got '" + typeof userValue + "'", "ERROR");
-                        // Если тип не совпал, тоже прогоняем дефолт через хелпер
-                        result[key] = resolveDefault(rules.default, parsedConfig);
+                        rawValue = resolveDefault(rules.default, parsedConfig);
                     } else {
-                        result[key] = userValue;
+                        rawValue = userValue;
                     }
                 }
+
+                // Прогоняем значение через функцию нормализации
+                result[key] = normalizeValue(rawValue, rules.type);
             }
 
             for (var userKey in userSection) {
                 if (!properties[userKey]) {
-                    Logger.Log("[SimpleMenuAPI] Create: Unknown parameter '" + userKey + "' in '" + sectionName + "'", "WARNING"); // Лучше WARNING, чтобы не пугать
+                    Logger.Log("[SimpleMenuAPI] Create: Unknown parameter '" + userKey + "' in '" + sectionName + "'", "WARNING");
                 }
             }
             return result;
@@ -406,6 +490,7 @@ Create: function(userConfig) {
                     Logger.Log("[SimpleMenuAPI] Create: Element at index " + i + " has missing or unknown type '" + itemType + "'", "ERROR");
                     continue;
                 }
+                
                 var validItem = validateSection(
                     "elements[" + i + "] (" + itemType + ")", 
                     item, 
@@ -413,13 +498,17 @@ Create: function(userConfig) {
                     parsedConfig, 
                     globalSchema
                 );
+
+                // Корректируем логику границ (min/max/current)
+                validItem = sanitizeElementLogic(validItem, i);
+
                 validatedList.push(validItem);
             }
             return validatedList;
         }
 
         let config = {};
-        // ВАЖНО: Сначала валидируем drawing, чтобы заполнить стандартные значения
+        // Сначала валидируем drawing, чтобы заполнить стандартные значения
         // Передаем собираемый config, а не userConfig
         config.drawing = validateSection("drawing", userConfig.drawing, this.SCHEMA.drawing, config, this.SCHEMA);
         // Теперь валидируем остальное. Они смогут безопасно ссылаться на готовые значения в config.drawing
@@ -451,16 +540,10 @@ Create: function(userConfig) {
         let Typeface = android.graphics.Typeface;
         let ViewGroup = android.view.ViewGroup;
         let TypedValue = android.util.TypedValue;
-        let Context = android.content.Context;
-        let Build = android.os.Build;
         let TextUtils = android.text.TextUtils;
         let ctx = UI.getContext(); //Контекст интерфейса
 
-        //Перевод dp в px
-        function dpToPx(dp) {
-            let dm = ctx.getResources().getDisplayMetrics();
-            return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, dm);
-        };
+
 
         //функция предотвращения ошибок
         function preventSomeErrors(view) {
@@ -478,141 +561,32 @@ Create: function(userConfig) {
         };
 
         //Функция добавление подсказки элементу
-        function addHint(textview, element, key) {
-            if (typeof element.hint === "object") {
-                if (typeof element.hint.text === "string" && typeof element.hint.buttonText === "string") {
-
-                    let hintIsClosable = element.hint.isClosable
-                    let hintSymbol = element.hint.symbol
-                    let hintSymbolColor
-                    let hintText = element.hint.text
-                    let hintButtonText = element.hint.buttonText
-
-                    if (typeof element.hint.symbol === "undefined") {
-                        hintSymbol = "ⓘ"
-                    };
-                    if (!SimpleMenu.isColor(element.hint.symbolColor)) {
-                        hintSymbolColor = "#FFFFFF"
-                    } else {
-                        hintSymbolColor = SimpleMenu.ConvertColor(element.hint.symbolColor, "hex")
-                    };
-                    if (typeof element.hint.isClosable === "undefined") {
-                        hintIsClosable = true
-                    };
-
-                    //Создание подсказки
-                    textview.setText(Html.fromHtml(textview.getText().replace("\n", "<br>") + " <font color='" + hintSymbolColor + "'>" + hintSymbol + "</font>"));
-                    textview.setOnClickListener(new OnClickListener({
-                        onClick: function() {
-                            let hint_dialog = new AlertDialog.Builder(ctx);
-                            hint_dialog.setCancelable(hintIsClosable);
-                            hint_dialog.setMessage(hintText);
-                            hint_dialog.setPositiveButton(hintButtonText, null);
-                            hint_dialog.show();
-                        }
-                    }));
-                } else {
-                    throw new Error("Error!\nUnable to create hint on «" + key + "» element, you may have forgotten to set the values of the «hintText» and «buttonText» properties of the «hint» object")
-                };
-            };
-        };
-
-        //Функция установления имени элемента
-        function setName(textview, element, key) {
-            if (typeof element.name === "string") {
-                textview.setText(element.name);
-            } else {
-                throw new Error("Error!\nUnable to set the name of the «" + key + "» element, check that the value type of the «name» property is «string»");
-            };
-        };
-
-        //Функция установления размера текста имени элемента
-        function setNameSize(textview, element) {
-            if (typeof element.nameSize === "number") {
-                textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.nameSize);
-            } else {
-                textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-            };
-        };
-
-        //Функция установления цвета текста имени элемента
-        function setNameColor(textview, element) {
-            if (SimpleMenu.isColor(element.nameColor)) {
-                textview.setTextColor(SimpleMenu.ConvertColor(element.nameColor, "name"))
-            }
-        };
-
-        //Функция установления текста кнопки элемента
-        function setButtonText(button, element, key) {
-            if (typeof element.buttonText === "string") {
-                button.setText(element.buttonText);
-            } else {
-                throw new Error("Error!\nUnable to set button text for «" + key + "» element, check that «buttonText» property value type is «string»");
-            };
-        };
-
-        //Функция установления размера текста кнопки элемента
-        function setButtonTextSize(button, element) {
-            if (!isNaN(element.buttonTextSize)) {
-                button.setTextSize(TypedValue.COMPLEX_UNIT_SP, Number(element.buttonTextSize));
-            } else {
-                button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-            };
-        };
-
-        //Функция установления цвета текста кнопки элемента
-        function setButtonTextColor(button, element) {
-            if (SimpleMenu.ConvertColor(element.buttonTextColor, "boolean")) {
-                button.setTextColor(SimpleMenu.ConvertColor(element.buttonTextColor, "name"))
-            }
-        };
-
-        //Функция установления направления градиента и цветов разделителя
-        function setSeparatorColorAndGradientDirection(textview, element) {
-            let separatorGradientDirection = element.separatorGradientDirection
-            let separatorColor = element.separatorColor
-            //Если переменная separatorColor не существует или имеет не тот тип
-            if (typeof separatorColor === "undefined") {
-                separatorColor = [Color.WHITE]
-            };
-            //Если переменная separatorGradientDirection не существует или имеет не тот тип
-            if (typeof separatorGradientDirection !== "number") {
-                separatorGradientDirection = GradientDrawable.Orientation.LEFT_RIGHT
-            };
-            //Если указанный цвет не массив, то переменная помещается в массив
-            if (typeof separatorColor !== "object") {
-                separatorColor = [separatorColor]
-            };
-            //Преобразовываем каждый элемент массива к формату цвета "name"
-            for (let i = 0; i < separatorColor.length; i++) {
-                separatorColor[i] = SimpleMenu.ConvertColor(separatorColor, "name")
-            };
-            //ставим фон разделителю, в независимости от количества цветов в массиве
-            textview.setBackground(new GradientDrawable(separatorGradientDirection, separatorColor))
-        };
+        function addHint(textview, element) {
+            textview.setText(Html.fromHtml(textview.getText().replace("\n", "<br>") + " <font color='" + SimpleMenu.ConvertColor(element.hint.symbolColor, "hex") + "'>" + element.hint.symbol + "</font>")); //не хватает element.hint.symbolSize
+            textview.setOnClickListener(new OnClickListener({
+                onClick: function() {
+                    let hint_dialog = new AlertDialog.Builder(ctx);
+                    hint_dialog.setMessage(element.hint.text);
+                    //hint_dialog.setMessageColor(element.hint.textColor)
+                    //hint_dialog.setMessageSize(element.hint.textSize)
+                    hint_dialog.setPositiveButton(element.hint.buttonText, null);
+                    //hint_dialog.setPositiveButtonColor(element.hint.buttonTextColor);
+                    //hint_dialog.setPositiveButtonSize(element.hint.buttonTextSize);
+                    hint_dialog.setCancelable(element.hint.isClosable);
+                    hint_dialog.show();
+                }
+            }));
+        };;
 
         //Функция установления имени, размера текста и цвета текста имени разделителя
         function setNameAndNameSizeAndNameColor(textview, element) {
-            if (typeof element.name === "string") {
+            if (typeof element.name !== null) {
                 textview.setMinimum(dpToPx(4));
                 textview.setText("	" + element.name);
-                if (SimpleMenu.ConvertColor(element.textColor, "boolean")) {
-                    textview.setTextColor(SimpleMenu.ConvertColor(element.hint.symbolColor, "name"))
-                } else {
-                    textview.setTextColor(color.BLACK)
-                };
-                if (!isNaN(element.nameSize)) {
-                    textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, Number(element.nameSize));
-                } else {
-                    textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-                };
+                textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.nameSize);
                 textview.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
             } else {
-                if (!isNaN(element.separatorHeight)) {
-                    textview.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(element.separatorHeight), 1));
-                } else {
-                    textview.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(3), 1));
-                }
+                textview.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, element.separatorHeight, 1));
             };
         };
 
@@ -1028,19 +1002,19 @@ Create: function(userConfig) {
                                 switch (element.type) {
                                     case "button":
                                         //Установление имени элемента
-                                        setName(textview, element, key);
+                                        textview.setText(element.name);
                                         //Установление размера текста имени элемента
-                                        setNameSize(textview, element);
+                                        textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.nameSize);
                                         //Установление цвета текста имени элемента
-                                        setNameColor(textview, element);
+                                        element.nameColor !== null && textview.setTextColor(SimpleMenu.ConvertColor(element.nameColor, "name"))
                                         textview.setLayoutParams(params.textview);
                                         textview.setEllipsize(TextUtils.TruncateAt.END);;
                                         //Установление текста кнопки элемента
-                                        setButtonText(button, element, key)
+                                        button.setText(element.buttonText);
                                         //Установление размера текста кнопки элемента
-                                        setButtonTextSize(button, element);
+                                        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.buttonTextSize);
                                         //Установление цвета текста кнопки элемента
-                                        setButtonTextColor(button, element);
+                                        element.buttonTextColor !== null && button.setTextColor(SimpleMenu.ConvertColor(element.buttonTextColor, "name"));
                                         button.setLayoutParams(params.button);
                                         button.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                                         //Создание функции кнопки
@@ -1051,15 +1025,13 @@ Create: function(userConfig) {
                                         break;
                                     case "checkbox":
                                         //Установление имени элемента
-                                        setName(textview, element, key);
+                                        textview.setText(element.name);
                                         //Установление размера текста имени элемента
-                                        setNameSize(textview, element);
+                                        textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.nameSize);
                                         //Установление цвета текста имени элемента
-                                        setNameColor(textview, element);
+                                        element.nameColor !== null && textview.setTextColor(SimpleMenu.ConvertColor(element.nameColor, "name"))
                                         textview.setLayoutParams(params.textview);
                                         textview.setEllipsize(TextUtils.TruncateAt.END);
-                                        //Установление цвета текста имени элемента
-                                        setNameColor(textview, element);
                                         let checkbox = new CheckBox(ctx);
                                         //Установление состояния флажка
                                         setState(checkbox, element);
@@ -1077,18 +1049,18 @@ Create: function(userConfig) {
                                     case "separator":
                                         textview.setPadding(dpToPx(2), 0, dpToPx(2), 0);
                                         //Установление направления градиента и цветов разделителя
-                                        setSeparatorColorAndGradientDirection(textview, element)
+                                        textview.setBackground(new GradientDrawable(element.separatorGradientDirection, element.separatorColor));
                                         //Установление имени, размера текста и цвета текста имени разделителя
                                         setNameAndNameSizeAndNameColor(textview, element);
                                         root.addView(textview);
                                         break;
                                     case "switch":
                                         //Установление имени элемента
-                                        setName(textview, element, key);
+                                        textview.setText(element.name);
                                         //Установление размера текста имени элемента
-                                        setNameSize(textview, element);
+                                        textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.nameSize);
                                         //Установление цвета текста имени элемента
-                                        setNameColor(textview, element);
+                                        element.nameColor !== null && textview.setTextColor(SimpleMenu.ConvertColor(element.nameColor, "name"))
                                         textview.setLayoutParams(params.textview);
                                         textview.setEllipsize(TextUtils.TruncateAt.END);
                                         let switch_ = new Switch(ctx);
@@ -1105,22 +1077,22 @@ Create: function(userConfig) {
                                         break;
                                     case "seekbar":
                                         //Установление имени элемента
-                                        setName(textview, element, key);
+                                        textview.setText(element.name);
                                         //Установление размера текста имени элемента
-                                        setNameSize(textview, element);
+                                        textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.nameSize);
                                         //Установление цвета текста имени элемента
-                                        setNameColor(textview, element);
+                                        element.nameColor !== null && textview.setTextColor(SimpleMenu.ConvertColor(element.nameColor, "name"))
                                         //Установление цвета текста имени элемента
                                         textview.setLayoutParams(params.textview);
                                         textview.setEllipsize(TextUtils.TruncateAt.END);
                                         //Установление текста кнопки элемента
-                                        setButtonText(button, element, key, element.buttonText);
+                                        button.setText(element.buttonText);
                                         //Установление состояния ползунка тексту кнопки, если это разрешено
                                         setSeekbarStateToButtonTextIfAllowed(button, element, key);
                                         //Установление размера текста кнопки элементам
-                                        setButtonTextSize(button, element);
+                                        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.buttonTextSize);
                                         //Установление цвета текста кнопки элемента
-                                        setButtonTextColor(button, element);
+                                        element.buttonTextColor !== null && button.setTextColor(SimpleMenu.ConvertColor(element.buttonTextColor, "name"));
                                         button.setLayoutParams(params.button);
                                         button.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                                         //Создания диалога ползунка
@@ -1131,11 +1103,11 @@ Create: function(userConfig) {
                                         break;
                                     case "edittext":
                                         //Установление имени элемента
-                                        setName(textview, element, key);
+                                        textview.setText(element.name);
                                         //Установление размера текста имени элемента
-                                        setNameSize(textview, element);
+                                        textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.nameSize);
                                         //Установление цвета текста имени элемента
-                                        setNameColor(textview, element);
+                                        element.nameColor !== null && textview.setTextColor(SimpleMenu.ConvertColor(element.nameColor, "name"))
                                         textview.setLayoutParams(params.textview);
                                         textview.setEllipsize(TextUtils.TruncateAt.END);
                                         //Установление текста кнопки элемента
@@ -1143,9 +1115,9 @@ Create: function(userConfig) {
                                         //Установление редактируемого текста тексту кнопки, если это разрешено
                                         setEditTextToButtonTextIfAllowed(button, element, key);
                                         //Установление размера текста кнопки элемента
-                                        setButtonTextSize(button, element);
+                                        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.buttonTextSize);
                                         //Установление цвета текста кнопки элемента
-                                        setButtonTextColor(button, element);
+                                        element.buttonTextColor !== null && button.setTextColor(SimpleMenu.ConvertColor(element.buttonTextColor, "name"));
                                         button.setLayoutParams(params.button);
                                         button.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                                         button.setOnClickListener(new OnClickListener({

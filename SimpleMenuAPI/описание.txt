@@ -1,0 +1,352 @@
+Общие:
+	type - Тип элемента. (divider, button, switch, checkbox, edittext, selection, multiselection, seekbar)
+	name - Название элемента.
+	textSize - Размер текста.
+	hint - Текст подсказки..
+	hintColor - Цвет подсказки. Пример: "#ffaaff".
+	hintSymbol - Символ подсказки. Пример: "@".
+	hintButtonText - Текст кнопки закрытия диалогового окна.
+
+Другое (Для разных элементов):
+	enableScrolling - Включить прокрутку текста в кнопке элемента. Пример: false.
+	state - Состояние переключателя. Пример: true.
+	buttonText - Текст кнопки элемента.
+	colors - список двух или более цветов. Пример: [Color.RED, Color.BLUE, Color.BLACK]. Для одинакового цвета: [Color.RED, Color.RED].
+	edittextHint - Подсказка для текстового поля.
+	edittextCurrent - текущий текст для текстового поля
+	edittextLinesCount - Максимальное количество линий для текстового поля. Пример: 2.
+	seekbarMin - Минимальное значение для ползунка.
+	seekbarMax - Максимальное значение для ползунка.
+	seekbarCurrent - Текущее значение ползунка.
+
+Функции (Для разных элементов):
+	onButtonClick: function(){ /*код*/ }
+	onSwitched: function(isSwitched){ /*код*/ }
+	onChecked: function(isChecked){ /*код*/ }
+	onSeekbarChange: function(progress){ /*код*/	}
+	onTextChanged: function(text){ /*код*/ }
+	beforeTextChanged: function(text){ /*код*/ }
+	onTextChanged: function(text){ /*код*/ }
+	onSelect: function(index, value, state){ /*множественная выборка*/ 	}
+	onSelect: function(index, value){ /*выборка*/ 	}
+
+Снизу расписаны элементы с всеми возможными параметрами. Не подходящие к типу элемента параметры будут проигнорированы.
+
+//КНОПКА
+	{
+		type: "button", //Обязательно
+		name: "Название элемента", //Обязательно
+		textSize: 16, //Необязательно
+		hint: "Подсказка", //Необязательно
+		hintColor: "#252525", //Цвет HEX, необязательно
+		hintSymbol: "(i)", //Необязательно
+		hintButtonText: "Скрыть", //Необязательно
+		enableScrolling: true, //Необязательно
+		buttonText: "ТекстКнопки", //Обязательно
+		onButtonClick: function(){ /*код*/ } //Обязательно
+	}
+
+//РЫЧАГ
+	{
+		type: "switch", //Обязательно
+		name: "Название элемента", //Обязательно
+		textSize: 16, //Необязательно
+		state: true, //Необязательно
+		hint: "Подсказка", //Необязательно
+		hintColor: "#252525", //Цвет HEX, необязательно
+		hintSymbol: "(i)", //Необязательно
+		hintButtonText: "Скрыть", //Необязательно
+		enableScrolling: true, //Необязательно
+		buttonText: "ТекстКнопки", //Обязательно
+		onSwitched: function(isSwitched){ /*код*/ } //Обязательно
+	}
+
+//ГАЛОЧКА (ФЛАЖОК)
+	{
+		type: "checkbox", //Обязательно
+		name: "Название элемента", //Обязательно
+		textSize: 16, //Необязательно
+		state: true, //Необязательно
+		hint: "Подсказка", //Необязательно
+		hintColor: "#252525", //Цвет HEX, необязательно
+		hintSymbol: "(i)", //Необязательно
+		hintButtonText: "Скрыть", //Необязательно
+		enableScrolling: true, //Необязательно
+		buttonText: "ТекстКнопки", //Обязательно
+		onChecked: function(isChecked){ /*код*/ } //Обязательно
+	}
+
+//ВВОД ТЕКСТА
+	{
+		type: "edittext", //Обязательно
+		name: "Название элемента", //Обязательно
+		textSize: 16, //Необязательно
+		hint: "Подсказка", //Необязательно
+		hintColor: "#252525", //Цвет HEX, необязательно
+		hintSymbol: "(i)", //Необязательно
+		hintButtonText: "Скрыть", //Необязательно
+		enableScrolling: true, //Необязательно
+		buttonText: "ТекстКнопки", //Обязательно
+		edittextHint: "Подсказка", //Необязательно
+		edittextCurrent: "Текст", //Необязательно
+		edittextLinesCount: 1, //Необязательно
+		afterTextChanged: function(text){ /*код*/ 	}, //Обязательно
+		beforeTextChanged: function(text){ /*код*/ }, //Обязательно
+		onTextChanged: function(text){ /*код*/ } //Обязательно
+	}
+
+//ПОЛЗУНОК
+	{
+		type: "seekbar", //Обязательно
+		name: "Название элемента", //Обязательно
+		textSize: 16, //Необязательно
+		hint: "Подсказка", //Необязательно
+		hintColor: "#252525", //Цвет HEX, необязательно
+		hintSymbol: "(i)", //Необязательно
+		hintButtonText: "Скрыть", //Необязательно
+		enableScrolling: true, //Необязательно
+		buttonText: "ТекстКнопки", //Обязательно
+		seekbarHint: "Подсказка", //Необязательно
+		seekbarMin: 0, //Обязательно
+		seekbarMax: 50, //Обязательно
+		seekbarCurrent: 25, //Необязательно
+		onSeekbarChange: function(progress){ /*код*/ } //Обязательно
+	}
+
+//ВЫБОРКА
+	{
+		type: "selection", //Обязательно
+		name: "Название элемента", //Обязательно
+		textSize: 16, //Необязательно
+		hint: "Подсказка", //Необязательно
+		hintColor: "#252525", //Цвет HEX, необязательно
+		hintSymbol: "(i)", //Необязательно
+		hintButtonText: "Скрыть", //Необязательно
+		enableScrolling: true, //Необязательно
+		buttonText: "ТекстКнопки", //Обязательно
+		data: [], //Обязательно
+		onSelect: function(index, value){ /*код*/ 	} //Обязательно
+	}
+
+//МНОЖЕСТВЕННАЯ ВЫБОРКА
+	{
+		type: "multiselection", //Обязательно
+		name: "Название элемента", //Обязательно
+		textSize: 16, //Необязательно
+		hint: "Подсказка", //Необязательно
+		hintColor: "#252525", //Цвет HEX, необязательно
+		hintSymbol: "(i)", //Необязательно
+		hintButtonText: "Скрыть", //Необязательно
+		enableScrolling: true, //Необязательно
+		buttonText: "ТекстКнопки", //Обязательно
+		data: [[], [], [], []], //Обязательно
+		onSelect: function(index, value, state){ /*код*/ 	} //Обязательно
+	}
+
+//РАЗДЕЛИТЕЛЬ
+	{
+		type: "divider", //Обязательно
+		text: "Test", //Необязательно
+		textSize: 16, //Необязательно
+		colors: [Color.BLUE, Color.RED] //Необязательно (Если не указать будет прозрачным)
+	}
+
+
+
+    SCHEMA: {
+        // ------------------------------------------------------------------------
+        // ГЛОБАЛЬНЫЕ НАСТРОЙКИ
+        // ------------------------------------------------------------------------
+        menu: {
+            title:          { type: "string" },
+            titleSize:      { type: "number",  default: 20 },
+            titleColor:     { type: "color",   default: "drawing.nameColor" },
+            isCancelable:   { type: "boolean", default: true },
+            
+            positiveButton: {
+                type: "object",
+                default: null,
+                properties: {
+                    text:    { type: "string" },
+                    onClick: { type: "function", default: null }
+                }
+            },
+            negativeButton: {
+                type: "object",
+                default: null,
+                properties: {
+                    text:    { type: "string" },
+                    onClick: { type: "function", default: null }
+                }
+            },
+            neutralButton: {
+                type: "object",
+                default: null,
+                properties: {
+                    text:    { type: "string" },
+                    onClick: { type: "function", default: null }
+                }
+            }
+        },
+
+        drawing: {
+            menuStyle:                  { type: "number", default: android.R.style.Theme_Material_Dialog_Alert },
+            animation:                  { type: "number", default: android.R.anim.slide_out_right },
+            nameSize:                   { type: "number", default: 16 },
+            nameColor:                  { type: "color",  default: null},
+            buttonTextSize:             { type: "number", default: 16 },
+            buttonTextColor:            { type: "color",  default: null},
+            separatorColor:             { type: "array",  default: [android.graphics.Color.WHITE] },
+            separatorHeight:            { type: "number", default: 3 },
+            separatorGradientDirection: { type: "number", default: android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT }
+        },
+
+        // ------------------------------------------------------------------------
+        // ВЛОЖЕННЫЕ ПОДОБЪЕКТЫ
+        // ------------------------------------------------------------------------
+        SUB_SCHEMAS: {
+            hint: {
+                type: "object",
+                default: null,
+                properties: {
+                    text:        { type: "string" },
+                    TODO textColor:   { type: "color",   default: "drawing.nameColor" },
+                    TODO textSize:    { type: "number",  default: "drawing.nameSize" },
+                    buttonText:  { type: "string",  default: "OK" },
+                    TODO buttonTextColor: { type: "color",   default: "drawing.buttonTextColor" },
+                    TODObuttonTextSize:  { type: "number",  default: "drawing.buttonTextSize" },
+                    symbol:      { type: "string",  default: "ⓘ" },
+                    symbolColor: { type: "color",   default: "drawing.nameColor" },
+                    TODO symbolSize:  { type: "number",  default: "drawing.nameSize" },
+                    isClosable:  { type: "boolean", default: true }
+                }
+            }
+        },
+
+        // ------------------------------------------------------------------------
+        // ЭЛЕМЕНТЫ МЕНЮ
+        // ------------------------------------------------------------------------
+        elements: {
+            type: "array",
+            default: null,
+            properties: {
+                button: {
+                    type:            { type: "string" },
+                    name:            { type: "string" },
+                    buttonText:      { type: "string" },
+                    onButtonClick:   { type: "function", default: null },
+                    nameSize:        { type: "number",   default: "drawing.nameSize" },
+                    nameColor:       { type: "color",    default: "drawing.nameColor" },
+                    buttonTextSize:  { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
+                    enableScrolling: { type: "boolean",  default: true },
+                    hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                switch: {
+                    type:       { type: "string" },
+                    name:       { type: "string" },
+                    onSwitched: { type: "function", default: null },
+                    nameSize:   { type: "number",   default: "drawing.nameSize" },
+                    nameColor:  { type: "color",    default: "drawing.nameColor" },
+                    state:      { type: "boolean",  default: false },
+                    hint:       { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                checkbox: {
+                    type:      { type: "string" },
+                    name:      { type: "string" },
+                    onChecked: { type: "function", default: null },
+                    nameSize:  { type: "number",   default: "drawing.nameSize" },
+                    nameColor: { type: "color",    default: "drawing.nameColor" },
+                    state:     { type: "boolean",  default: false },
+                    hint:      { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                edittext: {
+                    type:                       { type: "string" },
+                    name:                       { type: "string" },
+                    buttonText:                 { type: "string" },
+                    nameSize:                   { type: "number",   default: "drawing.nameSize" },
+                    nameColor:                  { type: "color",    default: "drawing.nameColor" },
+                    buttonTextSize:             { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextColor:            { type: "color",    default: "drawing.buttonTextColor" },
+                    buttonTextChangeToEditText: { type: "boolean",  default: true },
+                    edittextHint:               { type: "string",   default: "" },
+                    edittextCurrent:            { type: "string",   default: "" },
+                    edittextLinesCount:         { type: "number",   default: 1 },
+                    onButtonClick:              { type: "function", default: null },
+                    beforeTextChanged:          { type: "function", default: null },
+                    onTextChanged:              { type: "function", default: null },
+                    afterTextChanged:           { type: "function", default: null },
+                    hint:                       { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                seekbar: {
+                    type:       { type: "string" },
+                    name:       { type: "string" },
+                    buttonText: { type: "string" },
+                    seekbarDialog: {
+                        type: "object",
+                        properties: {
+                            min:            { type: "number" },
+                            max:            { type: "number" },
+                            step:           { type: "number", default: 1 },
+                            current:        { type: "number", default: 0 },
+                            positiveButton: { type: "string", default: "OK" },
+                            negativeButton: { type: "string", default: "Cancel" }
+                        }
+                    },
+                    nameSize:                       { type: "number",   default: "drawing.nameSize" },
+                    nameColor:                      { type: "color",    default: "drawing.nameColor" },
+                    buttonTextSize:                 { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextColor:                { type: "color",    default: "drawing.buttonTextColor" },
+                    buttonTextChangeToSeekBarState: { type: "boolean",  default: true },
+                    onButtonClick:                  { type: "function", default: null },
+                    beforeProgressChanged:          { type: "function", default: null },
+                    onProgressChanged:              { type: "function", default: null },
+                    afterProgressChanged:           { type: "function", default: null },
+                    hint:                           { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                selection: {
+                    type:             { type: "string" },
+                    name:             { type: "string" },
+                    data:             { type: "array" },
+                    nameSize:         { type: "number",   default: "drawing.nameSize" },
+                    nameColor:        { type: "color",    default: "drawing.nameColor" },
+                    buttonTextSize:   { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextColor:  { type: "color",    default: "drawing.buttonTextColor" },
+                    selectionDefault: { type: "number",   default: 0 },
+                    selectionCurrent: { type: "number",   default: 0 },
+                    onButtonClick:    { type: "function", default: null },
+                    onSelect:         { type: "function", default: null },
+                    hint:             { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                multiselection: {
+                    type:            { type: "string" },
+                    name:            { type: "string" },
+                    buttonText:      { type: "string" },
+                    data:            { type: "array" },
+                    nameSize:        { type: "number",   default: "drawing.nameSize" },
+                    nameColor:       { type: "color",    default: "drawing.nameColor" },
+                    buttonTextSize:  { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
+                    onButtonClick:   { type: "function", default: null },
+                    onSelect:        { type: "function", default: null },
+                    hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                divider: {
+                    type:                       { type: "string" },
+                    name:                       { type: "string", default: null },
+                    nameSize:                   { type: "number", default: "drawing.nameSize" },
+                    nameColor:                  { type: "color",  default: "drawing.nameColor" },
+                    separatorGradientDirection: { type: "number", default: "drawing.separatorGradientDirection" },
+                    separatorColor:             { type: "array",  default: "drawing.separatorColor" },
+                    separatorHeight:            { type: "number", default: "drawing.separatorHeight" }
+                }
+            }
+        }
+    },
