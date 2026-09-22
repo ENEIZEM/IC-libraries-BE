@@ -153,51 +153,29 @@
 
 
 
-    SCHEMA: {
+ SCHEMA: {
         // ------------------------------------------------------------------------
         // ГЛОБАЛЬНЫЕ НАСТРОЙКИ
         // ------------------------------------------------------------------------
         menu: {
             title:          { type: "string" },
-            titleSize:      { type: "number",  default: 20 },
-            titleColor:     { type: "color",   default: "drawing.nameColor" },
+            // titleSize:      { type: "number or string",  default: 20 },
+            // titleColor:     { type: "color",   default: "drawing.nameColor" },
             isCancelable:   { type: "boolean", default: true },
-            
-            positiveButton: {
-                type: "object",
-                default: null,
-                properties: {
-                    text:    { type: "string" },
-                    onClick: { type: "function", default: null }
-                }
-            },
-            negativeButton: {
-                type: "object",
-                default: null,
-                properties: {
-                    text:    { type: "string" },
-                    onClick: { type: "function", default: null }
-                }
-            },
-            neutralButton: {
-                type: "object",
-                default: null,
-                properties: {
-                    text:    { type: "string" },
-                    onClick: { type: "function", default: null }
-                }
-            }
+            positiveButton: { $ref: "SUB_SCHEMAS.systemButton", default: null },  
+            negativeButton: { $ref: "SUB_SCHEMAS.systemButton", default: null },
+            neutralButton:  { $ref: "SUB_SCHEMAS.systemButton", default: null }
         },
 
         drawing: {
             menuStyle:                  { type: "number", default: android.R.style.Theme_Material_Dialog_Alert },
             animation:                  { type: "number", default: android.R.anim.slide_out_right },
-            nameSize:                   { type: "number", default: 16 },
+            nameSize:                   { type: "number or string", default: 16 },
             nameColor:                  { type: "color",  default: null},
-            buttonTextSize:             { type: "number", default: 16 },
+            buttonTextSize:             { type: "number or string", default: 16 },
             buttonTextColor:            { type: "color",  default: null},
-            separatorColor:             { type: "array",  default: [android.graphics.Color.WHITE] },
-            separatorHeight:            { type: "number", default: 3 },
+            separatorColor:             { type: "color[]",  default: [android.graphics.Color.WHITE] },
+            separatorHeight:            { type: "number or string", default: 3 },
             separatorGradientDirection: { type: "number", default: android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT }
         },
 
@@ -210,18 +188,25 @@
                 default: null,
                 properties: {
                     text:        { type: "string" },
-                    TODO textColor:   { type: "color",   default: "drawing.nameColor" },
-                    TODO textSize:    { type: "number",  default: "drawing.nameSize" },
-                    buttonText:  { type: "string",  default: "OK" },
-                    TODO buttonTextColor: { type: "color",   default: "drawing.buttonTextColor" },
-                    TODObuttonTextSize:  { type: "number",  default: "drawing.buttonTextSize" },
+                    textColor:   { type: "color",   default: "drawing.nameColor" },
+                    textSize:    { type: "number or string",  default: "drawing.nameSize" },
+                    positiveButton: { $ref: "SUB_SCHEMAS.systemButton", default: null },  
                     symbol:      { type: "string",  default: "ⓘ" },
                     symbolColor: { type: "color",   default: "drawing.nameColor" },
-                    TODO symbolSize:  { type: "number",  default: "drawing.nameSize" },
+                    symbolSize:  { type: "number or string",  default: "drawing.nameSize" },
                     isClosable:  { type: "boolean", default: true }
+                }
+            },
+            systemButton: {
+                type: "object",
+                default: null,
+                properties: {
+                    text:    { type: "string" },
+                    onClick: { type: "function" }
                 }
             }
         },
+        
 
         // ------------------------------------------------------------------------
         // ЭЛЕМЕНТЫ МЕНЮ
@@ -235,46 +220,60 @@
                     name:            { type: "string" },
                     buttonText:      { type: "string" },
                     onButtonClick:   { type: "function", default: null },
-                    nameSize:        { type: "number",   default: "drawing.nameSize" },
+                    nameSize:        { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:       { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:  { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextSize:  { type: "number or string",   default: "drawing.buttonTextSize" },
                     buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
-                    enableScrolling: { type: "boolean",  default: true },
+                    useMarquee:         { type: "boolean",  default: true },
                     hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
                 },
 
                 switch: {
-                    type:       { type: "string" },
-                    name:       { type: "string" },
-                    onSwitched: { type: "function", default: null },
-                    nameSize:   { type: "number",   default: "drawing.nameSize" },
-                    nameColor:  { type: "color",    default: "drawing.nameColor" },
-                    state:      { type: "boolean",  default: false },
-                    hint:       { $ref: "SUB_SCHEMAS.hint", default: null }
+                    type:              { type: "string" },
+                    name:              { type: "string" },
+                    onSwitched:        { type: "function", default: null },
+                    nameSize:          { type: "number or string",   default: "drawing.nameSize" },
+                    nameColor:         { type: "color",    default: "drawing.nameColor" },
+                    state:             { type: "boolean",  default: false },
+                    useMarquee: { type: "boolean",  default: true },
+                    hint:              { $ref: "SUB_SCHEMAS.hint", default: null }
                 },
 
                 checkbox: {
-                    type:      { type: "string" },
-                    name:      { type: "string" },
-                    onChecked: { type: "function", default: null },
-                    nameSize:  { type: "number",   default: "drawing.nameSize" },
-                    nameColor: { type: "color",    default: "drawing.nameColor" },
-                    state:     { type: "boolean",  default: false },
-                    hint:      { $ref: "SUB_SCHEMAS.hint", default: null }
+                    type:              { type: "string" },
+                    name:              { type: "string" },
+                    onChecked:         { type: "function", default: null },
+                    nameSize:          { type: "number or string",   default: "drawing.nameSize" },
+                    nameColor:         { type: "color",    default: "drawing.nameColor" },
+                    state:             { type: "boolean",  default: false },
+                    useMarquee: { type: "boolean",  default: true },
+                    hint:              { $ref: "SUB_SCHEMAS.hint", default: null }
                 },
 
                 edittext: {
-                    type:                       { type: "string" },
-                    name:                       { type: "string" },
-                    buttonText:                 { type: "string" },
-                    nameSize:                   { type: "number",   default: "drawing.nameSize" },
-                    nameColor:                  { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:             { type: "number",   default: "drawing.buttonTextSize" },
-                    buttonTextColor:            { type: "color",    default: "drawing.buttonTextColor" },
-                    buttonTextChangeToEditText: { type: "boolean",  default: true },
-                    edittextHint:               { type: "string",   default: "" },
-                    edittextCurrent:            { type: "string",   default: "" },
-                    edittextLinesCount:         { type: "number",   default: 1 },
+                    type:                    { type: "string" },
+                    name:                    { type: "string" },
+                    nameSize:                { type: "number or string",   default: "drawing.nameSize" },
+                    nameColor:               { type: "color",    default: "drawing.nameColor" },
+                    buttonText:              { type: "string" },
+                    buttonTextSize:          { type: "number or string",   default: "drawing.buttonTextSize" },
+                    buttonTextColor:         { type: "color",    default: "drawing.buttonTextColor" },
+                    useEditTextAsButtonText: { type: "boolean",  default: true },
+                    useMarquee:              { type: "boolean",  default: true },
+                    editTextDialog: {
+                        type: "object",
+                        properties: {
+                            text:               { type: "string", default: "" }, 
+                            linesCount:         { type: "number or string", default: 1 }, 
+                            textSize:           { type: "number or string", default: "drawing.textSize" }, 
+                            textColor:          { type: "color", default: "drawing.textColor" },
+                            placeholder:        { type: "string", default: "" },
+                            placeholderOpacity: { type: "number", default: 0.5 },
+                            positiveButton:     { $ref: "SUB_SCHEMAS.systemButton", default: null },
+                            neutralButton:      { $ref: "SUB_SCHEMAS.systemButton", default: null },
+                            negativeButton:     { $ref: "SUB_SCHEMAS.systemButton", default: null }
+                        }
+                    },
                     onButtonClick:              { type: "function", default: null },
                     beforeTextChanged:          { type: "function", default: null },
                     onTextChanged:              { type: "function", default: null },
@@ -283,25 +282,31 @@
                 },
 
                 seekbar: {
-                    type:       { type: "string" },
-                    name:       { type: "string" },
-                    buttonText: { type: "string" },
+                    type:                        { type: "string" },
+                    name:                        { type: "string" },
+                    nameSize:                    { type: "number or string",   default: "drawing.nameSize" },
+                    nameColor:                   { type: "color",    default: "drawing.nameColor" },
+                    buttonText:                  { type: "string" },
+                    buttonTextSize:              { type: "number or string",   default: "drawing.buttonTextSize" },
+                    buttonTextColor:             { type: "color",    default: "drawing.buttonTextColor" },
+                    useSeekBarValueAsButtonText: { type: "boolean",  default: true },
+                    useMarquee:                  { type: "boolean",  default: true },
                     seekbarDialog: {
                         type: "object",
                         properties: {
-                            min:            { type: "number" },
-                            max:            { type: "number" },
-                            step:           { type: "number", default: 1 },
-                            current:        { type: "number", default: 0 },
-                            positiveButton: { type: "string", default: "OK" },
-                            negativeButton: { type: "string", default: "Cancel" }
+                            min:            { type: "number or string" },
+                            max:            { type: "number or string" },
+                            step:           { type: "number or string", default: 1 },
+                            current:        { type: "number or string", default: 0 },
+                            prefixText:     { type: "string", default: "" },
+                            suffixText:     { type: "string", default: "" },
+                            textSize:       { type: "number or string", default: "drawing.nameSize" },
+                            textColor:      { type: "color", default: "drawing.nameColor" },
+                            positiveButton: { $ref: "SUB_SCHEMAS.systemButton", default: null },
+                            neutralButton:  { $ref: "SUB_SCHEMAS.systemButton", default: null },
+                            negativeButton: { $ref: "SUB_SCHEMAS.systemButton", default: null }
                         }
                     },
-                    nameSize:                       { type: "number",   default: "drawing.nameSize" },
-                    nameColor:                      { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:                 { type: "number",   default: "drawing.buttonTextSize" },
-                    buttonTextColor:                { type: "color",    default: "drawing.buttonTextColor" },
-                    buttonTextChangeToSeekBarState: { type: "boolean",  default: true },
                     onButtonClick:                  { type: "function", default: null },
                     beforeProgressChanged:          { type: "function", default: null },
                     onProgressChanged:              { type: "function", default: null },
@@ -313,12 +318,12 @@
                     type:             { type: "string" },
                     name:             { type: "string" },
                     data:             { type: "array" },
-                    nameSize:         { type: "number",   default: "drawing.nameSize" },
+                    nameSize:         { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:        { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:   { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextSize:   { type: "number or string",   default: "drawing.buttonTextSize" },
                     buttonTextColor:  { type: "color",    default: "drawing.buttonTextColor" },
-                    selectionDefault: { type: "number",   default: 0 },
-                    selectionCurrent: { type: "number",   default: 0 },
+                    selectionDefault: { type: "number or string",   default: 0 },
+                    selectionCurrent: { type: "number or string",   default: 0 },
                     onButtonClick:    { type: "function", default: null },
                     onSelect:         { type: "function", default: null },
                     hint:             { $ref: "SUB_SCHEMAS.hint", default: null }
@@ -328,24 +333,24 @@
                     type:            { type: "string" },
                     name:            { type: "string" },
                     buttonText:      { type: "string" },
-                    data:            { type: "array" },
-                    nameSize:        { type: "number",   default: "drawing.nameSize" },
+                    data:            { type: "array[]" },
+                    nameSize:        { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:       { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:  { type: "number",   default: "drawing.buttonTextSize" },
+                    buttonTextSize:  { type: "number or string",   default: "drawing.buttonTextSize" },
                     buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
                     onButtonClick:   { type: "function", default: null },
                     onSelect:        { type: "function", default: null },
                     hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
                 },
 
-                divider: {
+                separator: {
                     type:                       { type: "string" },
                     name:                       { type: "string", default: null },
-                    nameSize:                   { type: "number", default: "drawing.nameSize" },
+                    nameSize:                   { type: "number or string", default: "drawing.nameSize" },
                     nameColor:                  { type: "color",  default: "drawing.nameColor" },
                     separatorGradientDirection: { type: "number", default: "drawing.separatorGradientDirection" },
-                    separatorColor:             { type: "array",  default: "drawing.separatorColor" },
-                    separatorHeight:            { type: "number", default: "drawing.separatorHeight" }
+                    separatorColor:             { type: "color[]",  default: "drawing.separatorColor" },
+                    separatorHeight:            { type: "number or string", default: "drawing.separatorHeight" }
                 }
             }
         }
