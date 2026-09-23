@@ -31,7 +31,7 @@ let SimpleMenu = {
             return "hex";
         }
         // RGB: массив из 3 чисел 0–255
-        if (config.prototype.toString.call(color) === "[object Array]" &&
+        if (Object.prototype.toString.call(color) === "[object Array]" &&
             color.length === 3 &&
             typeof color[0] === "number" && color[0] >= 0 && color[0] <= 255 &&
             typeof color[1] === "number" && color[1] >= 0 && color[1] <= 255 &&
@@ -318,7 +318,7 @@ let SimpleMenu = {
             return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, dm);
         };
 
-        //Валдация
+        // ВАЛИДАЦИЯ
         // Проверка типов
         function checkType(value, expectedType) {
             if (expectedType === "array") return Array.isArray(value);
@@ -593,13 +593,33 @@ let SimpleMenu = {
         };
 
         // Функция установки имени элемента
-        function setName(textview, element) {
-            //Установление имени элемента
+        function setName(textview, element, params) {
+            // Установление имени элемента
             textview.setText(element.name);
-            //Установление размера текста имени элемента
+            // Установление размера текста имени элемента
             textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.nameSize);
-            //Установление цвета текста имени элемента
+            // Установление цвета текста имени элемента
             element.nameColor !== null && textview.setTextColor(element.nameColor);
+            // Установка параметра
+            textview.setLayoutParams(params.textview);
+            // Установка отображения
+            textview.setEllipsize(TextUtils.TruncateAt.END);
+        }
+
+        function setButton(button, element) {
+            // Установление текста кнопки элемента
+            button.setText(element.buttonText);
+            // Установление размера текста кнопки элемента
+            button.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.buttonTextSize);
+            // Установление цвета текста кнопки элемента
+            element.buttonTextColor !== null && button.setTextColor(element.buttonTextColor);
+            // Установка параметра
+            button.setLayoutParams(params.button);
+            // Установка цвета фона
+            button.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            // Установка прокрутки текста кнопки элемента
+            element.useMarquee && applyMarquee(button);
+
         }
                                            
         // Функция создания функции переключателя
@@ -619,7 +639,7 @@ let SimpleMenu = {
             if (typeof element.onButtonClick !== null) {
                 button.setOnClickListener(new OnClickListener({
                     onClick: function(view) {
-                        element.onClick(view, index);
+                        element.onButtonClick(view, index);
                     }
                 }));
             }
@@ -693,57 +713,152 @@ let SimpleMenu = {
             }));
         };
 
-        //Функция создания диалога ползунка
+        // ПОЛЗУНОК
         function createSeekbarDialog(button, element, index, rootl, roott, rootsb) {
             button.setOnClickListener(new OnClickListener({
                 onClick: function(button) {
-                        // Создание функции ползунка
-                        element.onClick(button, index);
-
-                        rootl.setOrientation(LinearLayout.VERTICAL);
-                        rootl.setLayoutParams(params.dialog_layout);
-                        //Установление текста диалога
-                        roott.setText(element.seekbarDialog.prefixText + element.seekbarDialog.current + element.seekbarDialog.suffixText);
-                        //Установления цвета текста диалога
-                        element.seekbarDialogText.textColor !== null && roott.setTextColor(element.seekbarDialogText.textColor);
-                        //Установление размера текста диалога
-                        roott.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.seekbarDialog.textSize);
-
-                        roott.setTypeface(null, Typeface.BOLD);
-                        roott.setGravity(Gravity.LEFT);
-                        roott.setPadding(dpToPx(12), dpToPx(7), dpToPx(7), dpToPx(7));
-                        roott.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-                        //Установление текущего значения диалога
-                        rootsb.setProgress(element.seekbarDialog.current);
-                        //Установление минимального значения диалога
-                        rootsb.setMin(element.seekbarDialog.min);
-                        //Установление максимального значения диалога
-                        rootsb.setMax(element.seekbarDialog.max);
-                        //Функция создания первой функции ползунка
-                        setOnBeforeSeekbarChange(roott, element, index, rootsb);
-                        //Функция создания второй функции ползунка
-                        setOnAfterSeekbarChange(roott, element, index, rootsb);
-                        preventSomeErrors(roott);
-                        preventSomeErrors(rootsb);
-                        preventSomeErrors(rootl);
-                        rootl.addView(roott);
-                        rootl.addView(rootsb);
-                        //Установление стиля диалога
-                        let rootd = new AlertDialog.Builder(ctx, config.drawing.menuStyle);
-                        rootd.setView(rootl);
-                        //Установление положительной кнопки диалога
-                        element.seekbarDialog.positiveButton === "object" && setDialogPositiveButton(rootd, element.seekbarDialog, index);
-                        //Установление негативной кнопки диалога
-                        element.seekbarDialog.neutralButton === "object" && setDialogNegativeButton(rootd, element.seekbarDialog, index);
-                        //Установление нейтральной кнопки диалога
-                        element.seekbarDialog.negativeButton === "object" && setDialogNeutralButton(rootd, element.seekbarDialog, index);
-                        //Запуск диалога
-                        rootd.show();
+                    // Создание функции ползунка
+                    element.onButtonClick(button, index);
+                    rootl.setOrientation(LinearLayout.VERTICAL);
+                    rootl.setLayoutParams(params.dialog_layout);
+                    // Установление текста диалога
+                    roott.setText(element.seekbarDialog.prefixText + element.seekbarDialog.current + element.seekbarDialog.suffixText);
+                    // Установления цвета текста диалога
+                    element.seekbarDialog.textColor !== null && roott.setTextColor(element.seekbarDialogText.textColor);
+                    // Установление размера текста диалога
+                    roott.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.seekbarDialog.textSize);
+                    roott.setTypeface(null, Typeface.BOLD);
+                    roott.setGravity(Gravity.LEFT);
+                    roott.setPadding(dpToPx(12), dpToPx(7), dpToPx(7), dpToPx(7));
+                    roott.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+                    // Установление текущего значения диалога
+                    rootsb.setProgress(element.seekbarDialog.current);
+                    // Установление минимального значения диалога
+                    rootsb.setMin(element.seekbarDialog.min);
+                    // Установление максимального значения диалога
+                    rootsb.setMax(element.seekbarDialog.max);
+                    // Функция создания первой функции ползунка
+                    setOnBeforeSeekbarChange(roott, element, index, rootsb);
+                    // Функция создания второй функции ползунка
+                    setOnAfterSeekbarChange(roott, element, index, rootsb);
+                    preventSomeErrors(roott);
+                    preventSomeErrors(rootsb);
+                    preventSomeErrors(rootl);
+                    rootl.addView(roott);
+                    rootl.addView(rootsb);
+                    // Установление стиля диалога
+                    let rootd = new AlertDialog.Builder(ctx, config.drawing.menuStyle);
+                    rootd.setView(rootl);
+                    // Установление положительной кнопки диалога
+                    element.seekbarDialog.positiveButton === "object" && setDialogPositiveButton(rootd, element.seekbarDialog, index);
+                    // Установление негативной кнопки диалога
+                    element.seekbarDialog.neutralButton === "object" && setDialogNegativeButton(rootd, element.seekbarDialog, index);
+                    // Установление нейтральной кнопки диалога
+                    element.seekbarDialog.negativeButton === "object" && setDialogNeutralButton(rootd, element.seekbarDialog, index);
+                    // Запуск диалога
+                    rootd.show();
                 }
             }));
         };
 
         // РЕДАКТИРУЕМЫЙ ТЕКСТ
+        function createEditTextDialog(button, element, index, rootl, rootet) {
+            button.setOnClickListener(new OnClickListener({
+                onClick: function(button) {
+                    element.onButtonClick(button, index);
+                    rootl.setOrientation(LinearLayout.VERTICAL);
+                    rootl.setLayoutParams(params.dialog_layout);
+                    rootet.setHint(element.editTextDialog.placeholder);
+                    // rootet.setHintColor(element.editTextDialog.textColor); нужно адаптировать функция converColor для альфа канало (для element.editTextDialog.placeholderOpacity)
+                    // rootet.setHintSize(element.editTextDialog.textSize);
+                    rootet.setText(element.editTextDialog.text);
+                    rootet.setTextSize(element.editTextDialog.textSize);
+                    rootet.setTextColor(element.editTextDialog.textColor);
+                    rootet.setMaxLines(element.edittextLinesCount);
+                    rootet.addTextChangedListener(
+                        new TextWatcher({
+                            beforeTextChanged: function() {
+                                element.beforeTextChanged(rootet.getText(), index);
+                            },
+                            onTextChanged: function() {
+                                element.editTextDialog.text = rootet.getText();
+                                button.setText(rootet.getText());
+                                element.onTextChanged(rootet.getText(), index);
+                            },
+                            afterTextChanged: function() {
+                                element.afterTextChanged(rootet.getText(), index);
+                            }
+                        })
+                    );
+                    preventSomeErrors(rootet);
+                    preventSomeErrors(rootl);
+                    rootl.addView(rootet);
+                    let rootd = new AlertDialog.Builder(ctx, config.drawing.styleMenu); //был какой то dialog_config.style
+                    rootd.setView(rootl);
+                    // Установление положительной кнопки диалога
+                    element.editTextDialog.positiveButton === "object" && setDialogPositiveButton(rootd, element.editTextDialog, index);
+                    // Установление негативной кнопки диалога
+                    element.editTextDialog.neutralButton === "object" && setDialogNegativeButton(rootd, element.editTextDialog, index);
+                    // Установление нейтральной кнопки диалога
+                    element.editTextDialog.negativeButton === "object" && setDialogNeutralButton(rootd, element.editTextDialog, index);
+                    // Запуск диалога
+                    rootd.show();
+                }
+            }));
+        };
+
+        //СЕЛЕКТОР
+        function createSelection(button, element, index) {
+            button.setOnClickListener(new OnClickListener({
+                onClick: function(button) {
+                    element.onButtonClick(button, index);
+                    let rootd = new AlertDialog.Builder(ctx, config.drawing.styleMenu); //был какой то dialog_config.style
+                    rootd.setItems(element.data, function(view, pos, i) { //что за i и view и куда их?
+                        element.selectionCurrent = pos;
+                        element.onSelect(pos, element.data_set[pos]);
+                        button.setText(element.data_set[element.selectionCurrent]);
+                    });
+                    // rootd.setPositiveButton("Вернутся", null);
+                    rootd.show();
+                }
+            }));
+        }
+
+        //МУЛЬТИСЕЛЕКТОР
+        function createMultiSelection(button, element, index) {
+            button.setOnClickListener(new OnClickListener({
+                onClick: function(button) {
+                    element.onButtonClick(button, index);
+                    let rootd = new AlertDialog.Builder(ctx, config.drawing.styleMenu); //был какой то dialog_config.style
+                        //Проверка типа параметра
+                        let arr = element.data;
+                        let data1 = [];
+                        let data2 = [];
+                        let data3 = []; //непонятно зачем тут был и третий массви
+                        for (let i = 0; i < arr.length; i++) {
+                            // непонятно пока нужна ли до проверка и не перенести ли ее в валидатор
+                            // if (typeof element.data_set[i][0] === "undefined") {
+                            //     element.data_set[i][0] = undefined_text;
+                            // };
+                            // if (typeof element.data_set[i][1] === "undefined") {
+                            //     element.data_set[i][1] = false;
+                            // };
+                            // if (typeof element.data_set[i][2] === "undefined") {
+                            //     element.data_set[i][2] = element.data_set[i][1];
+                            // };
+                            data1.push(element.data[i][0]);
+                            data2.push(element.data[i][2]); //что значит вторй элемент в массиве? разве в передаваемом двумерном массиве в подмассивах 0 элемент это название а 1 элемент - булеан
+                        };
+                        rootd.setMultiChoiceItems(data1, data2, function(dialog, index, state) { //зачем тут dialog
+                            element.data[index][2] = state; //пересмотреть структуру передваемого объекта для улучшения 
+                            element.onSelect(element.data[index][0], index, state);
+                        });
+                    //rootd.setPositiveButton("Вернутся", null);
+                    rootd.show();
+                }
+            }));
+        }
+
         // Параметры элементов
         const params = {
             layout: new LinearLayout.LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT, 1),
@@ -758,7 +873,6 @@ let SimpleMenu = {
         };
 
         return {
-            //Создание функции получения объекта меню
             getContent: function() {
                 return config;
             },
@@ -779,12 +893,9 @@ let SimpleMenu = {
                                 root.setPadding(dpToPx(6), 0, dpToPx(6), 0);
                                 scrollable_container.addView(root);
                                 menu_container.addView(scrollable_container);
-
-                                let index = -1;
                                 //Создание элементов
-                                for (key in config.elements) {
-                                    index++;
-                                    let element = config.elements[key];
+                                for (let index = 0; index < config.elements.length(); index++){
+                                    let element = config.elements[index];
                                     let textview = new TextView(ctx);
                                     let button = new Button(ctx);
                                     let element_layout = new LinearLayout(ctx);
@@ -810,31 +921,19 @@ let SimpleMenu = {
                                     element.hint !== null && addHint(textview, element);
                                     switch (element.type) {
                                         case "button":
-                                            // Функция установки имени элемента
-                                            setName(textview, element);
-                                            textview.setLayoutParams(params.textview);
-                                            textview.setEllipsize(TextUtils.TruncateAt.END);
-                                            //Установление текста кнопки элемента
-                                            button.setText(element.buttonText);
-                                            //Установление размера текста кнопки элемента
-                                            button.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.buttonTextSize);
-                                            //Установление цвета текста кнопки элемента
-                                            element.buttonTextColor !== null && button.setTextColor(element.buttonTextColor);
-                                            button.setLayoutParams(params.button);
-                                            button.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                                            // Установка имени элемента
+                                            setName(textview, element, params);
+                                            //Установка кнопки элемента
+                                            setButton(button, element);
                                             //Создание функции кнопки
                                             setOnClick(button, element, index)
                                             element_layout.addView(textview);
                                             element_layout.addView(button);
                                             root.addView(element_layout);
-                                            //Установка прокрутки текста кнопки элемента
-                                            element.useMarquee && applyMarquee(button);
                                             break;
                                         case "checkbox":
-                                             // Функция установки имени элемента
-                                            setName(textview, element);                                           
-                                            textview.setLayoutParams(params.textview);
-                                            textview.setEllipsize(TextUtils.TruncateAt.END);
+                                            // Установка имени элемента
+                                            setName(textview, element, params);;                                           
                                             let checkbox = new CheckBox(ctx);
                                             //Установление состояния флажка
                                             checkbox.setChecked(element.state);
@@ -854,10 +953,8 @@ let SimpleMenu = {
                                             root.addView(textview);
                                             break;
                                         case "switch":
-                                            // Функция установки имени элемента
-                                            setName(textview, element);
-                                            textview.setLayoutParams(params.textview);
-                                            textview.setEllipsize(TextUtils.TruncateAt.END);
+                                            // Установка имени элемента
+                                            setName(textview, element, params);
                                             let switch_ = new Switch(ctx);
                                             //Установление состояния переключателя
                                             switch_.setChecked(element.state);
@@ -871,219 +968,65 @@ let SimpleMenu = {
                                             root.addView(element_layout);
                                             break;
                                         case "seekbar":
-                                            // Функция установки имени элемента
-                                            setName(textview, element);
-                                            //Установление цвета текста имени элемента
-                                            textview.setLayoutParams(params.textview);
-                                            textview.setEllipsize(TextUtils.TruncateAt.END);
-                                            //Установление текста кнопки элемента
-                                            button.setText(element.useSeekBarValueAsButtonText ? element.seekbarDialog.current : element.buttonText);
-                                            //Установление размера текста кнопки элементам
-                                            button.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.buttonTextSize);
-                                            //Установление цвета текста кнопки элемента
-                                            element.buttonTextColor !== null && button.setTextColor(element.buttonTextColor);
-
-                                            button.setLayoutParams(params.button);
-                                            button.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                                            // Установка имени элемента
+                                            setName(textview, element, params);
+                                            //Установка кнопки элемента
+                                            setButton(button, element);
                                             //Создания диалога ползунка
                                             createSeekbarDialog(button, element, index, rootl, roott, rootsb);
                                             element_layout.addView(textview);
                                             element_layout.addView(button);
                                             root.addView(element_layout);
-                                            //Установка прокрутки текста кнопки элемента
-                                            element.useMarquee && applyMarquee(button);
                                             break;
                                         case "edittext":
-                                            // Функция установки имени элемента
-                                            setName(textview, element);
-                                            textview.setLayoutParams(params.textview);
-                                            textview.setEllipsize(TextUtils.TruncateAt.END);
-                                            //Установление редактируемого текста тексту кнопки, если это разрешено
-                                            button.setText(element.useEditTextAsButtonText ? element.editTextDialog.text : element.buttonText);
-                                            //Установление размера текста кнопки элемента
-                                            button.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.buttonTextSize);
-                                            //Установление цвета текста кнопки элемента
-                                            element.buttonTextColor !== null && button.setTextColor(element.buttonTextColor);
-
-                                            button.setLayoutParams(params.button);
-                                            button.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-                                            button.setOnClickListener(new OnClickListener({
-                                                onClick: function(button) {
-                                                    if (typeof element.onButtonClick === "function") {
-                                                        //Проверка типа параметра
-                                                        element.onButtonClick(button, indx);
-                                                    };
-                                                    rootl.setOrientation(LinearLayout.VERTICAL);
-                                                    rootl.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
-                                                    if (typeof element.edittextHint === "string") {
-                                                        //Проверка типа параметра
-                                                        rootet.setHint(element.edittextHint);
-                                                    };
-                                                    rootet.setText(element.edittextCurrent.toString());
-                                                    if (typeof element.edittextLinesCount === "number") {
-                                                        //Проверка типа параметра
-                                                        rootet.setMaxLines(element.edittextLinesCount);
-                                                    };
-                                                    rootet.addTextChangedListener(
-                                                        new TextWatcher({
-                                                            afterTextChanged: function() {
-                                                                if (typeof element.afterTextChanged === "function") {
-                                                                    //Проверка типа параметра
-                                                                    element.afterTextChanged(rootet.getText(), indx);
-                                                                };
-                                                            },
-                                                            beforeTextChanged: function() {
-                                                                if (typeof element.beforeTextChanged === "function") {
-                                                                    //Проверка типа параметра
-                                                                    element.beforeTextChanged(rootet.getText(), indx);
-                                                                };
-                                                            },
-                                                            onTextChanged: function() {
-                                                                element.edittextCurrent = rootet.getText();
-                                                                if (typeof element.onTextChanged === "function") {
-                                                                    //Проверка типа параметра
-                                                                    button.setText(rootet.getText());
-                                                                    element.onTextChanged(rootet.getText(), indx);
-                                                                };
-                                                            }
-                                                        })
-                                                    );
-                                                    preventSomeErrors(rootet);
-                                                    preventSomeErrors(rootl);
-                                                    rootl.addView(rootet);
-                                                    let rootd = new AlertDialog.Builder(ctx, dialog_config.style);
-                                                    rootd.setView(rootl);
-                                                    rootd.setPositiveButton("Вернутся", null);
-                                                    rootd.show();
-                                                }
-                                            }));
+                                            // Установка имени элемента
+                                            setName(textview, element, params);
+                                            // Установка кнопки элемента
+                                            setButton(button, element);
+                                            // Создание диалога редактируемого текста
+                                            createEditTextDialog(button, element, index, rootl, rootet);
                                             element_layout.addView(textview);
                                             element_layout.addView(button);
                                             root.addView(element_layout);
-                                            //Установка прокрутки текста кнопки элемента
-                                            element.useMarquee && applyMarquee(button);
                                             break;
                                         case "selection":
-                                            // Функция установки имени элемента
-                                            setName(textview, element);
-                                            textview.setLayoutParams(params.textview);
-                                            textview.setEllipsize(TextUtils.TruncateAt.END);
-                                            if (typeof element.selectionDefault === "undefined") {
-                                                //Проверка типа параметра
-                                                element.selectionDefault = 0;
-                                            };
-                                            if (typeof element.selectionDefault != "number") {
-                                                //Проверка типа параметра
-                                                element.selectionDefault = 0;
-                                            };
-                                            if (typeof element.selectionCurrent === "undefined") {
-                                                //Проверка типа параметра
-                                                element.selectionCurrent = element.selectionDefault;
-                                            };
-                                            button.setText(element.data_set[element.selectionCurrent]);
-                                            button.setLayoutParams(params.button);
-                                            button.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-                                            button.setOnClickListener(new OnClickListener({
-                                                onClick: function(button) {
-                                                    if (typeof element.onButtonClick === "function") {
-                                                        //Проверка типа параметра
-                                                        element.onButtonClick(button, indx);
-                                                    };
-                                                    let rootd = new AlertDialog.Builder(ctx, dialog_config.style);
-                                                    if (typeof element.data_set === "object") {
-                                                        //Проверка типа параметра
-                                                        rootd.setItems(element.data_set, function(view, pos, i) {
-                                                            element.selectionCurrent = pos;
-                                                            if (typeof element.onSelect === "function") {
-                                                                //Проверка типа параметра
-                                                                element.onSelect(pos, element.data_set[pos]);
-                                                            };
-                                                            button.setText(element.data_set[element.selectionCurrent]);
-                                                        });
-                                                    } else {
-                                                        rootd.setMessage("Элементы не заданы.");
-                                                    };
-                                                    rootd.setPositiveButton("Вернутся", null);
-                                                    rootd.show();
-                                                }
-                                            }));
+                                            // Установка имени элемента
+                                            setName(textview, element, params);
+                                            // Установка кнопки элемента
+                                            setButton(button, element);
+                                            // Создание диалога селектора
+                                            createSelection(button, element, index);
                                             element_layout.addView(textview);
                                             element_layout.addView(button);
                                             root.addView(element_layout);
                                             break;
                                         case "multiselection":
-                                            // Функция установки имени элемента
-                                            setName(textview, element);
-                                            textview.setLayoutParams(params.textview);
-                                            textview.setEllipsize(TextUtils.TruncateAt.END);
-                                            button.setText(element.buttonText);
-                                            button.setLayoutParams(params.button);
-                                            button.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-                                            button.setOnClickListener(new OnClickListener({
-                                                onClick: function(button) {
-                                                    if (typeof element.onButtonClick === "function") {
-                                                        //Проверка типа параметра
-                                                        element.onButtonClick(button, indx);
-                                                    };
-                                                    let rootd = new AlertDialog.Builder(ctx, dialog_config.style);
-                                                    if (typeof element.data_set === "object") {
-                                                        //Проверка типа параметра
-                                                        let arr = element.data_set;
-                                                        let data1 = [];
-                                                        let data2 = [];
-                                                        let data3 = [];
-                                                        for (let i = 0; i < arr.length; i++) {
-                                                            //Разбитие объекта на два списка
-                                                            if (typeof element.data_set[i][0] === "undefined") {
-                                                                element.data_set[i][0] = undefined_text;
-                                                            };
-                                                            if (typeof element.data_set[i][1] === "undefined") {
-                                                                element.data_set[i][1] = false;
-                                                            };
-                                                            if (typeof element.data_set[i][2] === "undefined") {
-                                                                element.data_set[i][2] = element.data_set[i][1];
-                                                            };
-                                                            data1.push(element.data_set[i][0]);
-                                                            data2.push(element.data_set[i][2]);
-                                                        };
-                                                        rootd.setMultiChoiceItems(data1, data2, function(dialog, index, state) {
-                                                            element.data_set[index][2] = state;
-                                                            if (typeof element.onSelect === "function") {
-                                                                //Проверка типа параметра
-                                                                element.onSelect(element.data_set[index][0], index, state);
-                                                            };
-                                                        });
-                                                    } else {
-                                                        //Если диалог пуст по элементам, создаст с таким текстом:
-                                                        rootd.setMessage("Элементы не заданы.");
-                                                    };
-                                                    rootd.setPositiveButton("Вернутся", null);
-                                                    rootd.show();
-                                                }
-                                            }));
+                                            // Установка имени элемента
+                                            setName(textview, element, params);
+                                            // Установка кнопки элемента
+                                            setButton(button, element);
+                                            // Создание диалога мультиселектора
+                                            createMultiSelection(button, element, index);
                                             element_layout.addView(textview);
                                             element_layout.addView(button);
                                             root.addView(element_layout);
                                             break;
-                                        default: //Тип элемента неправильно установлен
-                                            Logger.Log("Error!\nCannot create element «"+key+"» with type «"+element.type+"», perhaps type «"+element.type+"» doesn't exist");
-                                            break;
+                                        default:
+                                            Logger.Log("[SimpleMenuAPI] Create: Unknown element '" + element.type + "'. Expected one of: " + Object.keys(SCHEMA.elements.properties).join(", "), "WARNING");
                                     };
                                 };
                                 
                                 let dialog = new AlertDialog.Builder(ctx, config.drawing.menuStyle);
                                 dialog.setTitle(config.menu.title);
-                                // dialog.setTitleSize(config.menu.titleSize);
+                                // dialog.setTitleSize(config.menu.titleSize); //пока неизвестно нужно ли это
                                 // config.menu.titleColor !== dialog.setTitleColor(config.menu.titleColor);
                                 dialog.setView(menu_container);
-
                                 //Установка положительной кнопки
                                 element.menu.positiveButton === "object" && setDialogPositiveButton(dialog, config.menu, index);
                                 //Установка негативной кнопки
                                 element.menu.negativeButton === "object" && setDialogNegativeButton(dialog, config.menu, index);
                                 //Установка нейтральной кнопки
                                 element.menu.neutralButton === "object" && setDialogNeutralButton(dialog, config.menu, index);
- 
                                 //Установка анимации и запуск меню
                                 dialog.show()
                                     .getWindow()
@@ -1091,7 +1034,7 @@ let SimpleMenu = {
                                     .getChildAt(0)
                                     .startAnimation(android.view.animation.AnimationUtils.loadAnimation(d.getContext(), config.menu.drawing.animation));
                             } catch(err) {
-                                throw new Error("Unknown error!\n" + err);
+                                throw new Error("[SimpleMenuAPI] Create: Unknown error!\n" + err);
                             };
                         }
                     })
