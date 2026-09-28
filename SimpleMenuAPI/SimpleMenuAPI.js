@@ -20,6 +20,61 @@ LIBRARY({
     api: "CoreEngine"
 });
 
+let _cachedLang = null;
+let _cachedText = null;
+
+function getSystemDefaultText() {
+    const systemRes = android.content.res.Resources.getSystem();
+    const config = systemRes.getConfiguration();
+    const currentLocale = (config.locales && config.locales.size() > 0)
+        ? config.locales.get(0)
+        : (config.locale || java.util.Locale.getDefault());
+    const currentLang = currentLocale.getLanguage();
+    if (_cachedLang === currentLang && _cachedText !== null) return _cachedText;
+    const candidateKeys = [
+        "restore_default",
+        "reset_to_default",
+        "restore_defaults",
+        "reset_default",
+        "reset",
+        "revert",
+        "clear"
+    ];
+    let enRes = null;
+    if (currentLang !== "en") {
+        try {
+            const enConfig = new android.content.res.Configuration(config);
+            enConfig.setLocale(java.util.Locale.ENGLISH);
+            const enContext = context.createConfigurationContext(enConfig);
+            enRes = enContext.getResources();
+        } catch (e) {}
+    }
+    let englishFallback = null;
+    let result = null;
+    for (const key of candidateKeys) {
+        const id = systemRes.getIdentifier(key, "string", "android");
+        if (id === 0) continue;
+        try {
+            const strCurrent = systemRes.getString(id);
+            if (!strCurrent || !strCurrent.trim()) continue;
+            if (currentLang === "en") {
+                result = strCurrent;
+                break;
+            }
+            const strEn = enRes ? enRes.getString(id) : strCurrent;
+            if (strCurrent !== strEn) {
+                result = strCurrent;
+                break;
+            }
+            if (!englishFallback) englishFallback = strCurrent;
+        } catch (e) {}
+    }
+    if (result === null) result = englishFallback || "By default";
+    _cachedLang = currentLang;
+    _cachedText = result;
+    return result;
+}
+
 let SimpleMenu = {
     getColorType: function(color) {
         // Android color int (может быть отрицательным из-за альфы)
@@ -48,19 +103,19 @@ let SimpleMenu = {
     ConvertColor: function(color, finalType) {
         var colorType = this.getColorType(color);
         if (colorType === null) {
-            Logger.Log("[SimpleMenuAPI] ConvertColor: invalid color value", "ERROR");
+            Logger.Log("[SimpleMenuAPI] ConvertColor(): invalid color value", "ERROR");
         }
         if (typeof finalType === "undefined") {
-            Logger.Log('[SimpleMenuAPI] ConvertColor: missing required parameter "finalType". Allowed values: "rgb", "hex", "name"', "ERROR");
+            Logger.Log('[SimpleMenuAPI] ConvertColor(): missing required parameter "finalType". Allowed values: "rgb", "hex", "name"', "ERROR");
         }
         if (["rgb", "hex", "name"].indexOf(finalType) === -1) {
-            Logger.Log('[SimpleMenuAPI] ConvertColor: invalid finalType "' + finalType + '". Allowed values: "rgb", "hex", "name"', "ERROR");
+            Logger.Log('[SimpleMenuAPI] ConvertColor(): invalid finalType "' + finalType + '". Allowed values: "rgb", "hex", "name"', "ERROR");
         }
         // Тот же формат — возвращаем как есть
         if (colorType === finalType) {
             return color;
         }
-        // === Конвертация ===
+        // Конвертация
         switch (colorType) {
             case "name":
                 if (finalType === "rgb") {
@@ -111,13 +166,13 @@ let SimpleMenu = {
         // ГЛОБАЛЬНЫЕ НАСТРОЙКИ
         // ------------------------------------------------------------------------
         menu: {
-            title:          { type: "string" },
+            title:             { type: "string" },
             // titleSize:      { type: "number or string",  default: 20 },
             // titleColor:     { type: "color",   default: "drawing.nameColor" },
-            isCancelable:   { type: "boolean", default: true },
-            positiveButton: { $ref: "SUB_SCHEMAS.systemButton", default: null },  
-            negativeButton: { $ref: "SUB_SCHEMAS.systemButton", default: null },
-            neutralButton:  { $ref: "SUB_SCHEMAS.systemButton", default: null }
+            isReactivePattern: { type: "boolean", default: true },
+            positiveButton:    { $ref: "SUB_SCHEMAS.positiveButton", default: null },
+            negativeButton:    { $ref: "SUB_SCHEMAS.negativeButton", default: null },
+            neutralButton:     { $ref: "SUB_SCHEMAS.neutralButton", default: null }
         },
 
         drawing: {
@@ -127,11 +182,11 @@ let SimpleMenu = {
             nameColor:                  { type: "color",  default: null},
             buttonTextSize:             { type: "number or string", default: 16 },
             buttonTextColor:            { type: "color",  default: null},
-            separatorColor:             { type: "color[]",  default: [android.graphics.Color.WHITE] },
+            separatorColor:             { type: "color[]",  default: [android.graphics.Color.GRAY] },
             separatorHeight:            { type: "number or string", default: 3 },
             separatorGradientDirection: { type: "number", default: android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT }
         },
-
+        
         // ------------------------------------------------------------------------
         // ВЛОЖЕННЫЕ ПОДОБЪЕКТЫ
         // ------------------------------------------------------------------------
@@ -140,24 +195,38 @@ let SimpleMenu = {
                 type: "object",
                 default: null,
                 properties: {
-                    text:        { type: "string" },
-                    textColor:   { type: "color",   default: "drawing.nameColor" },
-                    textSize:    { type: "number or string",  default: "drawing.nameSize" },
-                    positiveButton: { $ref: "SUB_SCHEMAS.systemButton", default: null },  
-                    symbol:      { type: "string",  default: "ⓘ" },
-                    symbolColor: { type: "color",   default: "drawing.nameColor" },
-                    symbolSize:  { type: "number or string",  default: "drawing.nameSize" },
-                    isClosable:  { type: "boolean", default: true }
+                    text:           { type: "string" },
+                    textColor:      { type: "color",   default: "drawing.nameColor" },
+                    textSize:       { type: "number or string",  default: "drawing.nameSize" },
+                    symbol:         { type: "string",  default: "ⓘ" },
+                    symbolColor:    { type: "color",   default: "drawing.nameColor" },
+                    symbolSize:     { type: "number or string",  default: "drawing.nameSize" },
                 }
             },
-            systemButton: {
+            positiveButton: {
                 type: "object",
                 default: null,
                 properties: {
-                    text:    { type: "string" },
+                    text:    { type: "string", default: android.R.string.ok},
                     onClick: { type: "function" }
                 }
-            }
+            },
+            negativeButton: {
+                type: "object",
+                default: null,
+                properties: {
+                    text:    { type: "string", default: android.R.string.cancel },
+                    onClick: { type: "function" }
+                }
+            },
+            neutralButton: {
+                type: "object",
+                default: null,
+                properties: {
+                    text:    { type: "string", default: getSystemDefaultText()},
+                    onClick: { type: "function" }
+                }
+            },
         },
         
 
@@ -172,35 +241,78 @@ let SimpleMenu = {
                     type:            { type: "string" },
                     name:            { type: "string" },
                     buttonText:      { type: "string" },
+                    buttonTextSize:  { type: "number or string",   default: "drawing.buttonTextSize" },
+                    buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
+                    // useMarquee:      { type: "boolean",  default: true },
                     onButtonClick:   { type: "function", default: null },
                     nameSize:        { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:       { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:  { type: "number or string",   default: "drawing.buttonTextSize" },
-                    buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
-                    useMarquee:         { type: "boolean",  default: true },
                     hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
                 },
 
                 switch: {
                     type:              { type: "string" },
                     name:              { type: "string" },
-                    onSwitched:        { type: "function", default: null },
+                    onSwitch:          { type: "function", default: null },
                     nameSize:          { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:         { type: "color",    default: "drawing.nameColor" },
                     state:             { type: "boolean",  default: false },
-                    useMarquee: { type: "boolean",  default: true },
+                    // useMarquee:        { type: "boolean",  default: true },
                     hint:              { $ref: "SUB_SCHEMAS.hint", default: null }
                 },
 
                 checkbox: {
                     type:              { type: "string" },
                     name:              { type: "string" },
-                    onChecked:         { type: "function", default: null },
+                    onCheck:           { type: "function", default: null },
                     nameSize:          { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:         { type: "color",    default: "drawing.nameColor" },
                     state:             { type: "boolean",  default: false },
-                    useMarquee: { type: "boolean",  default: true },
+                    // useMarquee:        { type: "boolean",  default: true },
                     hint:              { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                selection: {
+                    type:                     { type: "string" },
+                    name:                     { type: "string" },
+                    nameSize:                 { type: "number or string",   default: "drawing.nameSize" },
+                    nameColor:                { type: "color",    default: "drawing.nameColor" },
+                    buttonText:               { type: "string",  default: null },
+                    buttonTextSize:           { type: "number or string",   default: "drawing.buttonTextSize" },
+                    buttonTextColor:          { type: "color",    default: "drawing.buttonTextColor" },
+                    data:                     { type: "string[]" },
+                    current:                  { type: "number or string",   default: 0 },
+                    useMarquee:               { type: "boolean",  default: true },
+                    onButtonClick:            { type: "function", default: null },
+                    onSelect:                 { type: "function", default: null },
+                    hint:                     { $ref: "SUB_SCHEMAS.hint", default: null }
+                },
+
+                multiselection: {
+                    type:            { type: "string" },
+                    name:            { type: "string" },
+                    nameSize:        { type: "number or string",   default: "drawing.nameSize" },
+                    nameColor:       { type: "color",    default: "drawing.nameColor" },
+                    buttonText:      { type: "string", default: null },
+                    buttonTextSize:  { type: "number or string",   default: "drawing.buttonTextSize" },
+                    buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
+                    // useMarquee:      { type: "boolean",  default: true },
+                    selectionDialog: {
+                        type: "object",
+                        properties: {
+                            title:          { type: "string", default: "elements.multiselection.name" },
+                            data:           { type: "string[]" },
+                            current:        { type: "number[]", default: [] },
+                            positiveButton: { $ref: "SUB_SCHEMAS.positiveButton" },
+                            neutralButton:  { $ref: "SUB_SCHEMAS.neutralButton", default: null },
+                            negativeButton: { $ref: "SUB_SCHEMAS.negativeButton" }
+                        }
+                    },
+                    onButtonClick:   { type: "function", default: null },
+                    beforeSelect:    { type: "function", default: null },
+                    onSelect:        { type: "function", default: null },
+                    afterSelect:     { type: "function", default: null },
+                    hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
                 },
 
                 edittext: {
@@ -208,29 +320,29 @@ let SimpleMenu = {
                     name:                    { type: "string" },
                     nameSize:                { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:               { type: "color",    default: "drawing.nameColor" },
-                    buttonText:              { type: "string" },
+                    buttonText:              { type: "string", default: null },
                     buttonTextSize:          { type: "number or string",   default: "drawing.buttonTextSize" },
                     buttonTextColor:         { type: "color",    default: "drawing.buttonTextColor" },
-                    useEditTextAsButtonText: { type: "boolean",  default: true },
-                    useMarquee:              { type: "boolean",  default: true },
+                    // useMarquee:              { type: "boolean",  default: true },
                     editTextDialog: {
                         type: "object",
                         properties: {
+                            title:              { type: "string", default: "elements.edittext.name" },
                             text:               { type: "string", default: "" }, 
-                            linesCount:         { type: "number or string", default: 1 }, 
-                            textSize:           { type: "number or string", default: "drawing.textSize" }, 
-                            textColor:          { type: "color", default: "drawing.textColor" },
+                            textSize:           { type: "number or string", default: "drawing.nameSize" }, 
+                            textColor:          { type: "color", default: "drawing.nameColor" },
                             placeholder:        { type: "string", default: "" },
                             placeholderOpacity: { type: "number", default: 0.5 },
-                            positiveButton:     { $ref: "SUB_SCHEMAS.systemButton", default: null },
-                            neutralButton:      { $ref: "SUB_SCHEMAS.systemButton", default: null },
-                            negativeButton:     { $ref: "SUB_SCHEMAS.systemButton", default: null }
+                            linesCount:         { type: "number or string", default: 1 }, 
+                            positiveButton:     { $ref: "SUB_SCHEMAS.positiveButton" },
+                            neutralButton:      { $ref: "SUB_SCHEMAS.neutralButton", default: null },
+                            negativeButton:     { $ref: "SUB_SCHEMAS.negativeButton" }
                         }
                     },
                     onButtonClick:              { type: "function", default: null },
-                    beforeTextChanged:          { type: "function", default: null },
-                    onTextChanged:              { type: "function", default: null },
-                    afterTextChanged:           { type: "function", default: null },
+                    beforeTextChange:          { type: "function", default: null },
+                    onTextChange:              { type: "function", default: null },
+                    afterTextChange:           { type: "function", default: null },
                     hint:                       { $ref: "SUB_SCHEMAS.hint", default: null }
                 },
 
@@ -239,71 +351,42 @@ let SimpleMenu = {
                     name:                        { type: "string" },
                     nameSize:                    { type: "number or string",   default: "drawing.nameSize" },
                     nameColor:                   { type: "color",    default: "drawing.nameColor" },
-                    buttonText:                  { type: "string" },
+                    buttonText:                  { type: "string", default: null },
                     buttonTextSize:              { type: "number or string",   default: "drawing.buttonTextSize" },
                     buttonTextColor:             { type: "color",    default: "drawing.buttonTextColor" },
-                    useSeekBarValueAsButtonText: { type: "boolean",  default: true },
-                    useMarquee:                  { type: "boolean",  default: true },
-                    seekbarDialog: {
+                    // useMarquee:                  { type: "boolean",  default: true },
+                    seekBarDialog: {
                         type: "object",
                         properties: {
                             min:            { type: "number or string" },
                             max:            { type: "number or string" },
                             step:           { type: "number or string", default: 1 },
                             current:        { type: "number or string", default: 0 },
+                            title:          { type: "string", default: "elements.seekbar.name" },
                             prefixText:     { type: "string", default: "" },
                             suffixText:     { type: "string", default: "" },
                             textSize:       { type: "number or string", default: "drawing.nameSize" },
                             textColor:      { type: "color", default: "drawing.nameColor" },
-                            positiveButton: { $ref: "SUB_SCHEMAS.systemButton", default: null },
-                            neutralButton:  { $ref: "SUB_SCHEMAS.systemButton", default: null },
-                            negativeButton: { $ref: "SUB_SCHEMAS.systemButton", default: null }
+                            positiveButton: { $ref: "SUB_SCHEMAS.positiveButton" },
+                            neutralButton:  { $ref: "SUB_SCHEMAS.neutralButton", default: null },
+                            negativeButton: { $ref: "SUB_SCHEMAS.negativeButton" }
                         }
                     },
                     onButtonClick:                  { type: "function", default: null },
-                    beforeProgressChanged:          { type: "function", default: null },
-                    onProgressChanged:              { type: "function", default: null },
-                    afterProgressChanged:           { type: "function", default: null },
+                    onProgressChange:              { type: "function", default: null },
+                    onStartTrackingTouch:          { type: "function", default: null },
+                    onStopTrackingTouch:           { type: "function", default: null },
                     hint:                           { $ref: "SUB_SCHEMAS.hint", default: null }
                 },
 
-                selection: {
-                    type:             { type: "string" },
-                    name:             { type: "string" },
-                    data:             { type: "array" },
-                    nameSize:         { type: "number or string",   default: "drawing.nameSize" },
-                    nameColor:        { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:   { type: "number or string",   default: "drawing.buttonTextSize" },
-                    buttonTextColor:  { type: "color",    default: "drawing.buttonTextColor" },
-                    selectionDefault: { type: "number or string",   default: 0 },
-                    selectionCurrent: { type: "number or string",   default: 0 },
-                    onButtonClick:    { type: "function", default: null },
-                    onSelect:         { type: "function", default: null },
-                    hint:             { $ref: "SUB_SCHEMAS.hint", default: null }
-                },
-
-                multiselection: {
-                    type:            { type: "string" },
-                    name:            { type: "string" },
-                    buttonText:      { type: "string" },
-                    data:            { type: "array[]" },
-                    nameSize:        { type: "number or string",   default: "drawing.nameSize" },
-                    nameColor:       { type: "color",    default: "drawing.nameColor" },
-                    buttonTextSize:  { type: "number or string",   default: "drawing.buttonTextSize" },
-                    buttonTextColor: { type: "color",    default: "drawing.buttonTextColor" },
-                    onButtonClick:   { type: "function", default: null },
-                    onSelect:        { type: "function", default: null },
-                    hint:            { $ref: "SUB_SCHEMAS.hint", default: null }
-                },
-
                 separator: {
-                    type:                       { type: "string" },
-                    name:                       { type: "string", default: null },
-                    nameSize:                   { type: "number or string", default: "drawing.nameSize" },
-                    nameColor:                  { type: "color",  default: "drawing.nameColor" },
-                    separatorGradientDirection: { type: "number", default: "drawing.separatorGradientDirection" },
-                    separatorColor:             { type: "color[]",  default: "drawing.separatorColor" },
-                    separatorHeight:            { type: "number or string", default: "drawing.separatorHeight" }
+                    type:                  { type: "string" },
+                    name:                  { type: "string", default: null },
+                    nameSize:              { type: "number or string", default: "drawing.nameSize" },
+                    nameColor:             { type: "color",  default: "drawing.nameColor" },
+                    lineGradientDirection: { type: "number", default: "drawing.separatorGradientDirection" },
+                    lineColor:             { type: "color[]",  default: "drawing.separatorColor" },
+                    lineHeight:            { type: "number or string", default: "drawing.separatorHeight" }
                 }
             }
         }
@@ -317,9 +400,23 @@ let SimpleMenu = {
             let dm = ctx.getResources().getDisplayMetrics();
             return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, dm);
         };
-
+        
         // ВАЛИДАЦИЯ
         // Проверка типов
+        let errors = [];
+        let warnings = [];
+
+        function reportValidation(errors, warnings) {
+            if (errors.length === 0 && warnings.length === 0) return;
+            if (errors.length > 0) {
+                var msg = "[SimpleMenuAPI] Create():\n  - " + errors.join("\n  - ");
+                if (warnings.length > 0) msg += "\n\nWarnings:\n  - " + warnings.join("\n  - ");
+                throw new Error(msg);
+            }
+            Logger.Log("[SimpleMenuAPI] Create():\n  - " + warnings.join("\n  - "), "WARNING"
+            );
+        }
+
         function checkType(value, expectedType) {
             if (expectedType === "array") return Array.isArray(value);
             if (expectedType === "color") return SimpleMenu.isColor(value);
@@ -332,28 +429,23 @@ let SimpleMenu = {
                 }
                 return false;
             }
-            if (expectedType === "array[]") return Array.isArray(value) && value.every(Array.isArray);
-            if (expectedType === "color[]") {
-                // Разрешаем передать как массив цветов, так и одиночный цвет
-                return SimpleMenu.isColor(value) || (Array.isArray(value) && value.every(SimpleMenu.isColor));
-            }
+            if (expectedType === "color[]") return SimpleMenu.isColor(value) || (Array.isArray(value) && value.every(SimpleMenu.isColor));
+            if (expectedType === "string[]") return Array.isArray(value) && value.every(function(item) { return typeof item === "string"; });
+            if (expectedType === "number[]") return Array.isArray(value) && value.every(function(item) { return typeof item === "number" && Number.isFinite(item); });
             return typeof value === expectedType;
         }
 
         // Преобразование и нормализация значений по типу
         function normalizeValue(value, expectedType) {
             if (value === null || value === undefined) return value;
-
             // Приведение строки/числа к чистому Number
             if (expectedType === "number or string") {
                 return Number(value);
             }
-
             // Нормализация одиночного цвета
             if (expectedType === "color") {
                 return SimpleMenu.ConvertColor(value, "name");
             }
-
             // Одиночный цвет превращаем в массив [color] и конвертируем все цвета в массиве
             if (expectedType === "color[]") {
                 var rawArray = Array.isArray(value) ? value : [value];
@@ -370,34 +462,30 @@ let SimpleMenu = {
         // Логическая валидация элементов (seekbar и др.)
         function sanitizeElementLogic(element, index) {
             if (!element) return element;
-
             if (element.type === "seekbar") {
                 var min = element.min;
                 var max = element.max;
                 var current = element.current;
-
                 // Если min больше max — меняем их местами
                 if (min > max) {
-                    Logger.Log("[SimpleMenuAPI] Create: elements[" + index + "] (seekbar) 'min' (" + min + ") > 'max' (" + max + "). Swapping values.", "WARNING");
+                    warnings.push("[SimpleMenuAPI] Create(): elements[" + index + "] (seekbar) 'min' (" + min + ") > 'max' (" + max + "). Swapping values.");
                     element.min = max;
                     element.max = min;
                     min = element.min;
                     max = element.max;
                 }
-
                 // Подгоняем current под границы [min, max]
                 if (current < min) {
-                    Logger.Log("[SimpleMenuAPI] Create: elements[" + index + "] (seekbar) 'current' (" + current + ") is lower than 'min' (" + min + "). Set to min.", "WARNING");
+                    warnings.push("[SimpleMenuAPI] Create(): elements[" + index + "] (seekbar) 'current' (" + current + ") is lower than 'min' (" + min + "). Set to min.");
                     element.current = min;
                 } else if (current > max) {
-                    Logger.Log("[SimpleMenuAPI] Create: elements[" + index + "] (seekbar) 'current' (" + current + ") is higher than 'max' (" + max + "). Set to max.", "WARNING");
+                    warnings.push("[SimpleMenuAPI] Create(): elements[" + index + "] (seekbar) 'current' (" + current + ") is higher than 'max' (" + max + "). Set to max.");
                     element.current = max;
                 }
             }
-
             // Преобразование dp в px
-            if(element.type == 'separator'){
-                element.separatorHeight = dpToPx(element.separatorHeight);
+            if(element.type === "separator"){
+                element.lineHeight = dpToPx(element.lineHeight);
             }
 
             return element;
@@ -455,14 +543,13 @@ let SimpleMenu = {
                 var rawValue;
                 if (userValue === undefined || userValue === null) {
                     if (rules.default === undefined) {
-                        Logger.Log("[SimpleMenuAPI] Create: Missing required parameter '" + key + "' in '" + sectionName + "'!", "ERROR");
+                        errors.push("[SimpleMenuAPI] Create(): Missing required parameter '" + key + "' in '" + sectionName + "'!");
                         rawValue = null;
                     } else {
                         rawValue = resolveDefault(rules.default, parsedConfig);
                     }
                 } else {
-                    if (rules.type && !checkType(userValue, rules.type)) {
-                        Logger.Log("[SimpleMenuAPI] Create: Parameter '" + key + "' in '" + sectionName + "' expected type '" + rules.type + "', but got '" + typeof userValue + "'", "ERROR");
+                    if (rules.type && !checkType(userValue, rules.type)) {                        errors.push("[SimpleMenuAPI] Create(): Parameter '" + key + "' in '" + sectionName + "' expected type '" + rules.type + "', but got '" + typeof userValue + "'");
                         rawValue = resolveDefault(rules.default, parsedConfig);
                     } else {
                         rawValue = userValue;
@@ -475,7 +562,7 @@ let SimpleMenu = {
 
             for (var userKey in userSection) {
                 if (!properties[userKey]) {
-                    Logger.Log("[SimpleMenuAPI] Create: Unknown parameter '" + userKey + "' in '" + sectionName + "'", "WARNING");
+                    warnings.push("[SimpleMenuAPI] Create(): Unknown parameter '" + userKey + "' in '" + sectionName + "'");
                 }
             }
             return result;
@@ -490,7 +577,7 @@ let SimpleMenu = {
                 var item = userElements[i];
                 var itemType = item.type;
                 if (!itemType || !elementsSchema[itemType]) {
-                    Logger.Log("[SimpleMenuAPI] Create: Element at index " + i + " has missing or unknown type '" + itemType + "'", "ERROR");
+                    errors.push("[SimpleMenuAPI] Create(): Element at index " + i + " has missing or unknown type '" + itemType + "'");
                     continue;
                 }
                 
@@ -517,12 +604,12 @@ let SimpleMenu = {
         config.menu = validateSection("menu", userConfig.menu, this.SCHEMA.menu, config, this.SCHEMA);
         config.elements = validateElements(userConfig.elements, this.SCHEMA, config);
 
-        //сокращения
+        reportValidation(errors, warnings);
+
+        // CREATE
         let AlertDialog = android.app.AlertDialog;
         let Button = android.widget.Button;
         let CheckBox = android.widget.CheckBox;
-        let Color = android.graphics.Color;
-        let ColorDrawable = android.graphics.drawable.ColorDrawable;
         let DialogInterface = android.content.DialogInterface;
         let EditText = android.widget.EditText;
         let GradientDrawable = android.graphics.drawable.GradientDrawable;
@@ -553,270 +640,183 @@ let SimpleMenu = {
         };
 
         // Установление прокрутки
-        function applyMarquee(view) {
-            view.setEllipsize(TextUtils.TruncateAt.MARQUEE);
-            view.setMarqueeRepeatLimit(-1);
-            view.setSingleLine(true);
-            view.setSelected(true);
-        };
+        // function applyMarquee(button) {
+        //     button.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        //     button.setMarqueeRepeatLimit(-1);
+        //     button.setSingleLine(true);
+        //     button.setSelected(true);
+        // };
 
-        // Функция добавление подсказки элементу
-        function addHint(textview, element) {  
-            textview.setText(Html.fromHtml(textview.getText().replace("\n", "<br>") + " <font color='" + SimpleMenu.ConvertColor(element.hint.symbolColor, "hex") + "'>" + element.hint.symbol + "</font>")); //не хватает element.hint.symbolSize
-            textview.setOnClickListener(new OnClickListener({
-                onClick: function() {
-                    let hint_dialog = new AlertDialog.Builder(ctx);
-                    hint_dialog.setMessage(element.hint.text);
-                    //hint_dialog.setMessageColor(element.hint.textColor)
-                    //hint_dialog.setMessageSize(element.hint.textSize)
-                    hint_dialog.setPositiveButton(element.hint.buttonText, null);
-                    //hint_dialog.setPositiveButtonColor(element.hint.buttonTextColor);
-                    //hint_dialog.setPositiveButtonSize(element.hint.buttonTextSize);
-                    hint_dialog.setCancelable(element.hint.isClosable);
-                    hint_dialog.show();
-                }
-            }));
-        };
-
-        // Функция установления параметров разделителя
-        function setSeparator(textview, element) {
-            if (typeof element.name !== null) {
-                textview.setMinimum(dpToPx(4));
-                textview.setText("	" + element.name);
-                textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.nameSize);
-                element.nameColor !== null && textview.setTextColor(element.nameColor);
-                textview.setBackground(new GradientDrawable(element.separatorGradientDirection, element.separatorColor));
-                textview.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        // СЕПАРАТОР
+        function setSeparator(config, content_container) {
+            let textview = new TextView(ctx);
+            textview.setPadding(dpToPx(2), 0, dpToPx(2), 0);
+            if (config.lineColor.length === 1) {
+                textview.setBackground(new android.graphics.drawable.ColorDrawable(config.lineColor[0]));
             } else {
-                textview.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, element.separatorHeight, 1));
+                textview.setBackground(new GradientDrawable(config.lineGradientDirection, config.lineColor));
+            }
+            if (config.name !== null) {
+                textview.setMinimum(dpToPx(4));
+                textview.setText("	" + config.name);
+                textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, config.nameSize);
+                if (config.nameColor !== null) textview.setTextColor(config.nameColor);
+                textview.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+                textview.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            } else {
+                textview.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, config.lineHeight, 1));
+
             };
+            content_container.addView(textview);
         };
 
-        // Функция установки имени элемента
-        function setName(textview, element, params) {
-            // Установление имени элемента
-            textview.setText(element.name);
-            // Установление размера текста имени элемента
-            textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.nameSize);
-            // Установление цвета текста имени элемента
-            element.nameColor !== null && textview.setTextColor(element.nameColor);
-            // Установка параметра
-            textview.setLayoutParams(params.textview);
-            // Установка отображения
-            textview.setEllipsize(TextUtils.TruncateAt.END);
+        // ИМЯ ЭЛЕМЕНТА
+        function setName(config, name_container, element_container) {
+            let textview = new TextView(ctx);
+            textview.setText(config.name); // Установление текста
+            textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, config.nameSize); // Установление размера текста
+            if (config.nameColor !== null) textview.setTextColor(config.nameColor);
+            textview.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.WRAP_CONTENT
+            )); // Установка параметра
+            textview.setEllipsize(TextUtils.TruncateAt.END); // Установка отображения
+            textview.setMaxLines(2); // Установка количества строк 
+            textview.setGravity(Gravity.START | Gravity.CENTER_VERTICAL); // Установка расположения внутри родителя
+            if (config.hint !== null) { //Добавление подсказки элементу
+                textview.setText(Html.fromHtml(textview.getText().replace("\n", "<br>") + " <font color='" + SimpleMenu.ConvertColor(config.hint.symbolColor, "hex") + "'>" + config.hint.symbol + "</font>")); //не хватает config.hint.symbolSize
+                if (typeof config.hint.positiveButton === "object") {
+                    textview.setOnClickListener(new OnClickListener({
+                        onClick: function() {
+                            let hint_dialog = new AlertDialog.Builder(ctx, config.drawing.menuStyle);
+                            hint_dialog.setMessage(config.hint.text);
+                            //hint_dialog.setMessageColor(config.hint.textColor)
+                            //hint_dialog.setMessageSize(config.hint.textSize)
+                            hint_dialog.setCancelable(true);
+                            hint_dialog.setCanceledOnTouchOutside(true);
+                            hint_dialog.show();
+                        }
+                    }));
+                }
+            }
+            name_container.addView(textview); // Добавление текста в контейнер имени
+            element_container.addView(name_container);
         }
 
-        function setButton(button, element) {
-            // Установление текста кнопки элемента
-            button.setText(element.buttonText);
-            // Установление размера текста кнопки элемента
-            button.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.buttonTextSize);
-            // Установление цвета текста кнопки элемента
-            element.buttonTextColor !== null && button.setTextColor(element.buttonTextColor);
-            // Установка параметра
-            button.setLayoutParams(params.button);
-            // Установка цвета фона
-            button.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            // Установка прокрутки текста кнопки элемента
-            element.useMarquee && applyMarquee(button);
-
-        }
-                                           
-        // Функция создания функции переключателя
-        function setOnSwitched(switch_, element, index) {
-            if (typeof element.onSwitched !== null) {
-                switch_.setOnCheckedChangeListener(new OnCheckedChangeListener({
-                    onCheckedChanged: function(view, isChecked) {
-                        element.state = isChecked;
-                        element.onSwitched(view, index, isChecked);
+        // КНОПОКИ ДИАЛОГА
+        function setClosable(config, dialog, main, index, positiveFunction) {
+            if (typeof config.positiveButton === "object") {
+                dialog.setPositiveButton(config.positiveButton.text, new DialogInterface.OnClickListener({
+                    onClick: function() {
+                        positiveFunction && positiveFunction();
+                        config.positiveButton.onClick(dialog, index);
                     }
                 }));
             }
-        };
-
-        // Функция создания функции кнопки
-        function setOnClick(button, element, index) {
-            if (typeof element.onButtonClick !== null) {
-                button.setOnClickListener(new OnClickListener({
-                    onClick: function(view) {
-                        element.onButtonClick(view, index);
+            if (typeof config.negativeButton === "object") {
+                dialog.setNegativeButton(config.negativeButton.text, new DialogInterface.OnClickListener({
+                    onClick: function() {
+                        config.negativeButton.onClick(dialog, index);
                     }
                 }));
             }
-        };
+            if (typeof config.neutralButton === "object") {
+                dialog.setNeutralButton(config.neutralButton.text, new DialogInterface.OnClickListener({
+                    onClick: function() {
+                        config.neutralButton.onClick(dialog, index);
+                    }
+                }));
+            }
+            dialog.setCancelable(true);
+            dialog.setCanceledOnTouchOutside(main && config.isReactivePattern); // меню (если реактивное) - да, диалог или тразакционное - нет
+            if (typeof config.negativeButton === "object") { 
+                dialog.setOnCancelListener(new DialogInterface.OnCancelListener({
+                    onCancel: function(dialog) {
+                        config.negativeButton.onClick(dialog, index);
+                    }
+                }));
+            }
+        }
 
-        // Функция создания функции флажка
-        function setOnChecked(checkbox, element, index) {
-            if (typeof element.onChecked !== null) {
+        // КНОПКА
+        function createButton(config, widget_container, element_container, content_container, index, onClickFunction) {
+            const chevronWidth = dpToPx(20);
+            // Текст значения
+            let button_text = new TextView(ctx);
+            if (config.buttonText !== null) button_text.setText(config.buttonText);
+            if (config.buttonTextColor !== null) button_text.setTextColor(config.buttonTextColor);
+            button_text.setTextSize(TypedValue.COMPLEX_UNIT_SP, config.buttonTextSize);
+            button_text.setMaxLines(2);
+            button_text.setEllipsize(TextUtils.TruncateAt.END);
+            button_text.setMaxWidth(maxTextWidth);
+            button_text.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            button_text.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
+            // Слот шеврона
+            let chevron = new TextView(ctx);
+            chevron.setText(">");
+            chevron.setTextSize(TypedValue.COMPLEX_UNIT_SP, config.buttonTextSize);
+            if (config.buttonTextColor !== null) chevron.setTextColor(config.buttonTextColor);
+            chevron.setGravity(Gravity.CENTER);
+            chevron.setLayoutParams(new LinearLayout.LayoutParams(chevronWidth, LayoutParams.WRAP_CONTENT));
+            widget_container.addView(button_text);
+            widget_container.addView(chevron);
+            widget_container.setClickable(true);
+            widget_container.setOnClickListener(new OnClickListener({
+                onClick: function(button) {
+                    onClickFunction && onClickFunction(config, button, index);
+                    if (config.onButtonClick !== null) config.onButtonClick(button, index);
+                }
+            }));
+            element_container.addView(widget_container);
+            content_container.addView(element_container);
+        }
+
+        // ФЛАЖОК                                 
+        function createCheckBox(config, widget_container, element_container, content_container, index) {
+            let checkbox = new CheckBox(ctx);
+            checkbox.setChecked(config.state);
+            checkbox.setLayoutParams(params.selectable_element);
+            if (config.onCheck != null) {
                 checkbox.setOnCheckedChangeListener(new OnCheckedChangeListener({
-                    onCheckedChanged: function(view, isChecked) {
-                        element.state = isChecked;
-                        element.onChecked(view, index, isChecked);
+                    onCheckedChanged: function(checkbox, isChecked) {
+                        config.state = isChecked;
+                        config.onCheck(checkbox, isChecked, index);
                     }
                 }));
             }
-        };
+            widget_container.addView(checkbox);
+            element_container.addView(widget_container);
+            content_container.addView(element_container);
+        }
 
-        // ПОЗУНОК   
-        //Функция создания первой функции ползунка
-        function setOnBeforeSeekbarChange(roott, element, index, rootsb) {
-            rootsb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener({
-                onProgressChanged: function() {
-                    //Выполнение пользовательского кода
-                    element.seekbarDialog.beforeProgressChanged(rootsb.getProgress(), rootsb, index);
-                    //Обновление значения параметра current объекта seekbarDialog
-                    element.seekbarDialog.current = rootsb.getProgress();
-                    //Обновление текста диалога
-                    roott.setText(element.seekbarDialog.prefixText + rootsb.getProgress() + element.seekbarDialog.suffixText);
-                }
-            }))
-        };
+        // ПЕРЕКЛЮЧАТЕЛЬ
+        function createSwitch(config, widget_container, element_container, content_container, index) {
+            let switcher = new Switch(ctx);
+            switcher.setChecked(config.state);
+            switcher.setLayoutParams(params.selectable_element);
+            if (config.onSwitch != null) {
+                switcher.setOnCheckedChangeListener(new OnCheckedChangeListener({
+                    onCheckedChanged: function(switcher, isChecked) {
+                        config.state = isChecked;
+                        config.onSwitch(switcher, isChecked, index);
+                    }
+                }));
+            }
+            widget_container.addView(switcher);
+            element_container.addView(widget_container);
+            content_container.addView(element_container);
+        }
 
-        //Функция создания второй функции ползунка
-        function setOnAfterSeekbarChange(roott, element, index, rootsb) {
-            rootsb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener({
-                onProgressChanged: function() {
-                    //Обновление значения параметра current объекта seekbarDialog
-                    element.seekbarDialog.current = rootsb.getProgress();
-                    //Обновление текста диалога
-                    roott.setText(element.seekbarDialog.prefixText + rootsb.getProgress() + element.seekbarDialog.suffixText);
-                    //Выполнение пользовательского кода
-                    element.seekbarDialog.afterProgressChanged(rootsb.getProgress(), rootsb, index);
-                }
-            }))
-        };
-
-        //Функция установления положительной кнопки диалога
-        function setDialogPositiveButton(context, dialog, index) {
-            context.setPositiveButton(dialog.positiveButton.text, new DialogInterface.OnClickListener({
-                onClick: function(view) {
-                    object.positiveButton.onClick(view, index);
-                }
-            }));
-        };
-
-        //Функция установления негативной кнопки диалога
-        function setDialogNegativeButton(context, dialog, index) {
-            context.setNegativeButton(dialog.negativeButton.text, new DialogInterface.OnClickListener({
-                onClick: function(view) {
-                    object.negativeButton.onClick(view, index);
-                }
-            }));
-        };
-
-        //Функция установления нейтральной кнопки диалога
-        function setDialogNeutralButton(context, dialog, index) {
-            context.setNeutralButton(dialog.neutralButton.text, new DialogInterface.OnClickListener({
-                onClick: function(view) {
-                    element.seekbarDialog.neutralButton.onClick(view, index);
-                }
-            }));
-        };
-
-        // ПОЛЗУНОК
-        function createSeekbarDialog(button, element, index, rootl, roott, rootsb) {
-            button.setOnClickListener(new OnClickListener({
-                onClick: function(button) {
-                    // Создание функции ползунка
-                    element.onButtonClick(button, index);
-                    rootl.setOrientation(LinearLayout.VERTICAL);
-                    rootl.setLayoutParams(params.dialog_layout);
-                    // Установление текста диалога
-                    roott.setText(element.seekbarDialog.prefixText + element.seekbarDialog.current + element.seekbarDialog.suffixText);
-                    // Установления цвета текста диалога
-                    element.seekbarDialog.textColor !== null && roott.setTextColor(element.seekbarDialogText.textColor);
-                    // Установление размера текста диалога
-                    roott.setTextSize(TypedValue.COMPLEX_UNIT_SP, element.seekbarDialog.textSize);
-                    roott.setTypeface(null, Typeface.BOLD);
-                    roott.setGravity(Gravity.LEFT);
-                    roott.setPadding(dpToPx(12), dpToPx(7), dpToPx(7), dpToPx(7));
-                    roott.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-                    // Установление текущего значения диалога
-                    rootsb.setProgress(element.seekbarDialog.current);
-                    // Установление минимального значения диалога
-                    rootsb.setMin(element.seekbarDialog.min);
-                    // Установление максимального значения диалога
-                    rootsb.setMax(element.seekbarDialog.max);
-                    // Функция создания первой функции ползунка
-                    setOnBeforeSeekbarChange(roott, element, index, rootsb);
-                    // Функция создания второй функции ползунка
-                    setOnAfterSeekbarChange(roott, element, index, rootsb);
-                    preventSomeErrors(roott);
-                    preventSomeErrors(rootsb);
-                    preventSomeErrors(rootl);
-                    rootl.addView(roott);
-                    rootl.addView(rootsb);
-                    // Установление стиля диалога
-                    let rootd = new AlertDialog.Builder(ctx, config.drawing.menuStyle);
-                    rootd.setView(rootl);
-                    // Установление положительной кнопки диалога
-                    element.seekbarDialog.positiveButton === "object" && setDialogPositiveButton(rootd, element.seekbarDialog, index);
-                    // Установление негативной кнопки диалога
-                    element.seekbarDialog.neutralButton === "object" && setDialogNegativeButton(rootd, element.seekbarDialog, index);
-                    // Установление нейтральной кнопки диалога
-                    element.seekbarDialog.negativeButton === "object" && setDialogNeutralButton(rootd, element.seekbarDialog, index);
-                    // Запуск диалога
-                    rootd.show();
-                }
-            }));
-        };
-
-        // РЕДАКТИРУЕМЫЙ ТЕКСТ
-        function createEditTextDialog(button, element, index, rootl, rootet) {
-            button.setOnClickListener(new OnClickListener({
-                onClick: function(button) {
-                    element.onButtonClick(button, index);
-                    rootl.setOrientation(LinearLayout.VERTICAL);
-                    rootl.setLayoutParams(params.dialog_layout);
-                    rootet.setHint(element.editTextDialog.placeholder);
-                    // rootet.setHintColor(element.editTextDialog.textColor); нужно адаптировать функция converColor для альфа канало (для element.editTextDialog.placeholderOpacity)
-                    // rootet.setHintSize(element.editTextDialog.textSize);
-                    rootet.setText(element.editTextDialog.text);
-                    rootet.setTextSize(element.editTextDialog.textSize);
-                    rootet.setTextColor(element.editTextDialog.textColor);
-                    rootet.setMaxLines(element.edittextLinesCount);
-                    rootet.addTextChangedListener(
-                        new TextWatcher({
-                            beforeTextChanged: function() {
-                                element.beforeTextChanged(rootet.getText(), index);
-                            },
-                            onTextChanged: function() {
-                                element.editTextDialog.text = rootet.getText();
-                                button.setText(rootet.getText());
-                                element.onTextChanged(rootet.getText(), index);
-                            },
-                            afterTextChanged: function() {
-                                element.afterTextChanged(rootet.getText(), index);
-                            }
-                        })
-                    );
-                    preventSomeErrors(rootet);
-                    preventSomeErrors(rootl);
-                    rootl.addView(rootet);
-                    let rootd = new AlertDialog.Builder(ctx, config.drawing.styleMenu); //был какой то dialog_config.style
-                    rootd.setView(rootl);
-                    // Установление положительной кнопки диалога
-                    element.editTextDialog.positiveButton === "object" && setDialogPositiveButton(rootd, element.editTextDialog, index);
-                    // Установление негативной кнопки диалога
-                    element.editTextDialog.neutralButton === "object" && setDialogNegativeButton(rootd, element.editTextDialog, index);
-                    // Установление нейтральной кнопки диалога
-                    element.editTextDialog.negativeButton === "object" && setDialogNeutralButton(rootd, element.editTextDialog, index);
-                    // Запуск диалога
-                    rootd.show();
-                }
-            }));
-        };
-
-        //СЕЛЕКТОР
+        // СЕЛЕКТОР
         function createSelection(button, element, index) {
             button.setOnClickListener(new OnClickListener({
                 onClick: function(button) {
                     element.onButtonClick(button, index);
-                    let rootd = new AlertDialog.Builder(ctx, config.drawing.styleMenu); //был какой то dialog_config.style
-                    rootd.setItems(element.data, function(view, pos, i) { //что за i и view и куда их?
+                    let dialog = new AlertDialog.Builder(ctx, config.drawing.menuStyle);
+                    dialog.setItems(element.data, function(view, pos, i) { //что за i и view и куда их?
                         element.selectionCurrent = pos;
-                        element.onSelect(pos, element.data_set[pos]);
-                        button.setText(element.data_set[element.selectionCurrent]);
+                        element.onSelect(pos, element.data[pos]);
+                        button.setText(element.data[element.selectionCurrent]);
                     });
                     // rootd.setPositiveButton("Вернутся", null);
                     rootd.show();
@@ -824,52 +824,140 @@ let SimpleMenu = {
             }));
         }
 
-        //МУЛЬТИСЕЛЕКТОР
+        // МУЛЬТИСЕЛЕКТОР
         function createMultiSelection(button, element, index) {
             button.setOnClickListener(new OnClickListener({
                 onClick: function(button) {
                     element.onButtonClick(button, index);
-                    let rootd = new AlertDialog.Builder(ctx, config.drawing.styleMenu); //был какой то dialog_config.style
-                        //Проверка типа параметра
-                        let arr = element.data;
-                        let data1 = [];
-                        let data2 = [];
-                        let data3 = []; //непонятно зачем тут был и третий массви
-                        for (let i = 0; i < arr.length; i++) {
-                            // непонятно пока нужна ли до проверка и не перенести ли ее в валидатор
-                            // if (typeof element.data_set[i][0] === "undefined") {
-                            //     element.data_set[i][0] = undefined_text;
-                            // };
-                            // if (typeof element.data_set[i][1] === "undefined") {
-                            //     element.data_set[i][1] = false;
-                            // };
-                            // if (typeof element.data_set[i][2] === "undefined") {
-                            //     element.data_set[i][2] = element.data_set[i][1];
-                            // };
-                            data1.push(element.data[i][0]);
-                            data2.push(element.data[i][2]); //что значит вторй элемент в массиве? разве в передаваемом двумерном массиве в подмассивах 0 элемент это название а 1 элемент - булеан
-                        };
-                        rootd.setMultiChoiceItems(data1, data2, function(dialog, index, state) { //зачем тут dialog
-                            element.data[index][2] = state; //пересмотреть структуру передваемого объекта для улучшения 
-                            element.onSelect(element.data[index][0], index, state);
+                    let rootd = new AlertDialog.Builder(ctx, config.drawing.menuStyle); //был какой то dialog_config.style
+                    //Проверка типа параметра
+                    let arr = element.data;
+                    let data1 = [];
+                    let data2 = [];
+                    for (let i = 0; i < arr.length; i++) {
+                        data1.push(element.data[i][0]);
+                        data2.push(element.data[i][2]); //что значит вторй элемент в массиве? разве в передаваемом двумерном массиве в подмассивах 0 элемент это название а 1 элемент - булеан
+                    };
+                    rootd.setMultiChoiceItems(data1, data2, function(dialog, index, state) { //зачем тут dialog
+                        element.data[index][2] = state; //пересмотреть структуру передваемого объекта для улучшения 
+                        element.onSelect(element.data[index][0], index, state);
                         });
                     //rootd.setPositiveButton("Вернутся", null);
                     rootd.show();
+                    setClosable(element.selectionDialog, rootd, index, false);
                 }
             }));
         }
 
+        // ПОЛЗУНОК
+        function createSeekBarDialog(config, button, index) {
+            let seekbar = new SeekBar(ctx);
+            let layout = new LinearLayout(ctx);
+            let textview = new TextView(ctx);
+            button.setOnClickListener(new OnClickListener({
+                onClick: function(button) {
+                    config.onButtonClick(button, index);
+                    layout.setOrientation(LinearLayout.VERTICAL);
+                    layout.setLayoutParams(params.dialog_layout);
+                    textview.setText(config.seekBarDialog.prefixText + config.seekBarDialog.current + config.seekBarDialog.suffixText);
+                    config.seekBarDialog.textColor !== null && textview.setTextColor(config.seekBarDialog.textColor);
+                    textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, config.seekBarDialog.textSize);
+                    textview.setTypeface(null, Typeface.BOLD);
+                    textview.setGravity(Gravity.LEFT);
+                    textview.setPadding(dpToPx(12), dpToPx(7), dpToPx(7), dpToPx(7));
+                    textview.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+                    seekbar.setProgress(config.seekBarDialog.current);
+                    seekbar.setMin(config.seekBarDialog.min);
+                    seekbar.setMax(config.seekBarDialog.max);
+
+                    seekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener({
+                        onProgressChanged: function(sb, progress, fromUser) {
+                            textview.setText(config.seekBarDialog.prefixText + sb.getProgress() + config.seekBarDialog.suffixText);
+                            if (config.onProgressChange !== null) {
+                                config.onProgressChange(sb, progress, fromUser, index);
+                            }
+                        },
+                        onStartTrackingTouch: function(sb) {
+                            textview.setText(config.seekBarDialog.prefixText + sb.getProgress() + config.seekBarDialog.suffixText);
+                            if (config.onStartTrackingTouch !== null) {
+                                config.onStartTrackingTouch(sb, sb.getProgress(), index);
+                            }
+                        },
+                        onStopTrackingTouch: function(sb) {
+                            textview.setText(config.seekBarDialog.prefixText + sb.getProgress() + config.seekBarDialog.suffixText);
+                            if (config.onStopTrackingTouch !== null) {
+                                config.onStopTrackingTouch(sb, sb.getProgress(), index);
+                            }
+                        }
+                    }));
+
+                    preventSomeErrors(textview);
+                    preventSomeErrors(seekbar);
+                    preventSomeErrors(layout);
+
+                    layout.addView(textview);
+                    layout.addView(seekbar);
+                    let dialog = new AlertDialog.Builder(ctx, config.drawing.menuStyle);
+                    dialog.setView(layout);
+                    function updateCurrent() {
+                        config.seekBarDialog.current = seekbar.getProgress();
+                        button.setText(config.seekBarDialog.prefixText + seekbar.getProgress() + config.seekBarDialog.suffixText);
+                    }
+                    setClosable(config.seekBarDialog, dialog, index, false, updateCurrent);
+                    dialog.show();
+                }
+            }));
+        };
+
+        // РЕДАКТИРУЕМЫЙ ТЕКСТ
+        function createEditTextDialog(config, button, index) {
+            let edittext = new EditText(ctx);
+            let layout = new LinearLayout(ctx);
+            button.setOnClickListener(new OnClickListener({
+                onClick: function(button) {
+                    config.onButtonClick(button, index);
+                    layout.setOrientation(LinearLayout.VERTICAL);
+                    layout.setLayoutParams(params.dialog_layout);
+                    edittext.setHint(config.editTextDialog.placeholder);
+                    // edittext.setHintColor(config.editTextDialog.textColor); нужно адаптировать функция converColor для альфа канало (для config.editTextDialog.placeholderOpacity)
+                    // edittext.setHintSize(config.editTextDialog.textSize);
+                    edittext.setText(config.editTextDialog.text);
+                    edittext.setTextSize(config.editTextDialog.textSize);
+                    edittext.setTextColor(config.editTextDialog.textColor);
+                    edittext.setMaxLines(config.editTextDialog.linesCount);
+
+                    edittext.addTextChangedListener(new TextWatcher({
+                        beforeTextChanged: function(oldText, startPos, beforeCount, afterCount) {
+                            (config.beforeTextChange !== null) && config.beforeTextChange(String(oldText), startPos, beforeCount, afterCount, index);
+                        },
+                        onTextChanged: function(newText, start, beforeCount, afterCount) {
+                            (config.onTextChange !== null) && config.onTextChange(String(newText), start, beforeCount, afterCount, index);
+                        },
+                        afterTextChanged: function(finalText) {
+                            (config.afterTextChange !== null) && config.afterTextChange(String(finalText), index);
+                        }
+                    }));
+
+                    preventSomeErrors(edittext);
+                    preventSomeErrors(layout);
+                    layout.addView(edittext);
+                    let dialog = new AlertDialog.Builder(ctx, config.drawing.menuStyle);
+                    dialog.setView(layout);
+                    function updateCurrent() {
+                        config.editTextDialog.text = edittext.getText();
+                        button.setText(edittext.getText());
+                    }
+                    setClosable(config.editTextDialog, dialog, index, false, updateCurrent);
+                    dialog.show();
+                }
+            }));
+        };
+
         // Параметры элементов
         const params = {
-            layout: new LinearLayout.LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT, 1),
-            selectable: new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT, 2),
-            selectable2: new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT),
-            selectable_element: new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
-            switch_: new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT),
-            dialog_layout: new LinearLayout.LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT),
-            button: new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT, 2),
-            textview: new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1),
-            element: new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            selectable_element: new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
+            dialog_layout: new LinearLayout.LayoutParams(LinearLayout.LayoutParams.FILL_PARENT, LinearLayout.LayoutParams.FILL_PARENT),
+            element: new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         };
 
         return {
@@ -881,138 +969,125 @@ let SimpleMenu = {
                     new Runnable({
                         run: function() {
                             try {
-                                //Создание корневых элементов
+                                // Корень меню
                                 let menu_container = new RelativeLayout(ctx);
-                                menu_container.setLayoutParams(new RelativeLayout.LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
+                                menu_container.setLayoutParams(new RelativeLayout.LayoutParams(
+                                    LayoutParams.MATCH_PARENT,
+                                    LayoutParams.MATCH_PARENT
+                                ));
+
+                                // Скролл
                                 let scrollable_container = new ScrollView(ctx);
-                                scrollable_container.setLayoutParams(params.layout);
-                                let root = new LinearLayout(ctx);
-                                root.setLayoutParams(params.layout);
-                                root.setOrientation(LinearLayout.VERTICAL);
-                                root.setGravity(Gravity.CENTER | Gravity.CENTER);
-                                root.setPadding(dpToPx(6), 0, dpToPx(6), 0);
-                                scrollable_container.addView(root);
+                                scrollable_container.setLayoutParams(new RelativeLayout.LayoutParams(
+                                    LayoutParams.MATCH_PARENT,
+                                    LayoutParams.MATCH_PARENT
+                                ));
+
+                                // Внутренний вертикальный контейнер
+                                let content_container = new LinearLayout(ctx);
+                                content_container.setLayoutParams(new ScrollView.LayoutParams(
+                                    LayoutParams.MATCH_PARENT,
+                                    LayoutParams.WRAP_CONTENT
+                                ));
+                                content_container.setOrientation(LinearLayout.VERTICAL);
+                                content_container.setGravity(Gravity.CENTER);
+                                content_container.setPadding(dpToPx(6), 0, dpToPx(6), 0);
+
+                                scrollable_container.addView(content_container);
                                 menu_container.addView(scrollable_container);
-                                //Создание элементов
-                                for (let index = 0; index < config.elements.length(); index++){
-                                    let element = config.elements[index];
-                                    let textview = new TextView(ctx);
-                                    let button = new Button(ctx);
-                                    let element_layout = new LinearLayout(ctx);
-                                    let rootl = new LinearLayout(ctx);
-                                    let roott = new TextView(ctx);
-                                    let rootet = new EditText(ctx);
-                                    let rootsb = new SeekBar(ctx);
-                                    let l1 = new LinearLayout(ctx);
-                                    l1.setLayoutParams(params.selectable);
-                                    l1.setGravity(Gravity.CENTER);
-                                    let l2 = new LinearLayout(ctx);
-                                    l2.setLayoutParams(params.selectable2);
-                                    l2.setGravity(Gravity.CENTER);
-                                    element_layout.setLayoutParams(params.element);
-                                    element_layout.setGravity(Gravity.CENTER | Gravity.CENTER);
-                                    element_layout.setOrientation(LinearLayout.HORIZONTAL);
-                                    element_layout.setMinimumHeight(dpToPx(48));
-                                    element_layout.setPadding(dpToPx(6), 0, dpToPx(6), 0);
-                                    textview.setMaxLines(2);
-                                    button.setAllCaps(false);
-                                    textview.setGravity(Gravity.LEFT | Gravity.CENTER);
-                                    //Добавление подсказки элементу
-                                    element.hint !== null && addHint(textview, element);
-                                    switch (element.type) {
+
+                                // Создание элементов
+                                for (let index = 0; index < config.elements.length; index++){
+                                    let element_config = config.elements[index];
+
+                                    // Контейнер элемента
+                                    let element_container = new LinearLayout(ctx);
+                                    element_container.setLayoutParams(new LinearLayout.LayoutParams(
+                                        LayoutParams.MATCH_PARENT,
+                                        LayoutParams.WRAP_CONTENT
+                                    ));
+                                    element_container.setGravity(Gravity.CENTER_VERTICAL);
+                                    element_container.setOrientation(LinearLayout.HORIZONTAL);
+                                    element_container.setMinimumHeight(dpToPx(48));
+                                    element_container.setPadding(dpToPx(6), 0, dpToPx(6), 0);
+
+                                    // Контейнер имени элемента
+                                    let name_container = new LinearLayout(ctx);
+                                    name_container.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 3));
+                                    name_container.setGravity(Gravity.CENTER_VERTICAL);
+
+                                    // Контейнер интерактивного элемента
+                                    let widget_container = new LinearLayout(ctx);
+                                    widget_container.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1));
+                                    widget_container.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+
+                                    switch (element_config.type) {
+                                        case "separator":
+                                            setSeparator(element_config, content_container);
+                                            break;
                                         case "button":
-                                            // Установка имени элемента
-                                            setName(textview, element, params);
-                                            //Установка кнопки элемента
-                                            setButton(button, element);
-                                            //Создание функции кнопки
-                                            setOnClick(button, element, index)
-                                            element_layout.addView(textview);
-                                            element_layout.addView(button);
-                                            root.addView(element_layout);
+                                            setName(element_config, name_container, element_container);
+                                            createButton(element_config, widget_container, element_container, content_container, index);
                                             break;
                                         case "checkbox":
-                                            // Установка имени элемента
-                                            setName(textview, element, params);;                                           
-                                            let checkbox = new CheckBox(ctx);
-                                            //Установление состояния флажка
-                                            checkbox.setChecked(element.state);
-                                            checkbox.setLayoutParams(params.selectable_element);
-                                            checkbox.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
-                                            //Создания функции флажка
-                                            setOnChecked(checkbox, element, index);
-                                            element_layout.addView(textview);
-                                            l1.addView(l2);
-                                            l2.addView(checkbox);
-                                            element_layout.addView(l1);
-                                            root.addView(element_layout);
-                                            break;
-                                        case "separator":
-                                            textview.setPadding(dpToPx(2), 0, dpToPx(2), 0);
-                                            setSeparator(textview, element);
-                                            root.addView(textview);
+                                            setName(element_config, name_container, element_container);
+                                            createCheckBox(element_config, widget_container, element_container, content_container, index);
                                             break;
                                         case "switch":
-                                            // Установка имени элемента
-                                            setName(textview, element, params);
-                                            let switch_ = new Switch(ctx);
-                                            //Установление состояния переключателя
-                                            switch_.setChecked(element.state);
-                                            switch_.setLayoutParams(params.selectable_element);
-                                            //Создание функции переключателя
-                                            setOnSwitched(switch_, element, index);
-                                            element_layout.addView(textview);
-                                            l1.addView(l2);
-                                            l2.addView(switch_);
-                                            element_layout.addView(l1);
-                                            root.addView(element_layout);
+                                            setName(element_config, name_container, element_container);
+                                            createSwitch(element_config, widget_container, element_container, content_container, index);
                                             break;
+
+
+
                                         case "seekbar":
-                                            // Установка имени элемента
-                                            setName(textview, element, params);
+                                            setName(element_config, name_container, element_container);
+                                            button = new Button(ctx);
+                                            button.setAllCaps(false);
                                             //Установка кнопки элемента
-                                            setButton(button, element);
+                                            setButton(element_config, button, index);
                                             //Создания диалога ползунка
-                                            createSeekbarDialog(button, element, index, rootl, roott, rootsb);
-                                            element_layout.addView(textview);
-                                            element_layout.addView(button);
-                                            root.addView(element_layout);
+                                            createSeekBarDialog(element_config, button, index);
+                                            element_container.addView(textview);
+                                            element_container.addView(button);
+                                            content_container.addView(element_container);
                                             break;
                                         case "edittext":
-                                            // Установка имени элемента
-                                            setName(textview, element, params);
+                                            setName(element_config, name_container, element_container);
                                             // Установка кнопки элемента
-                                            setButton(button, element);
+                                            setButton(element_config, button, index);
                                             // Создание диалога редактируемого текста
-                                            createEditTextDialog(button, element, index, rootl, rootet);
-                                            element_layout.addView(textview);
-                                            element_layout.addView(button);
-                                            root.addView(element_layout);
+                                            createEditTextDialog(element_config, button, index);
+                                            element_container.addView(textview);
+                                            element_container.addView(button);
+                                            content_container.addView(element_container);
                                             break;
                                         case "selection":
-                                            // Установка имени элемента
-                                            setName(textview, element, params);
+                                            setName(element_config, name_container, element_container);
+                                            button = new Button(ctx);
+                                            button.setAllCaps(false);
                                             // Установка кнопки элемента
-                                            setButton(button, element);
+                                            setButton(element_config, button, index);
                                             // Создание диалога селектора
-                                            createSelection(button, element, index);
-                                            element_layout.addView(textview);
-                                            element_layout.addView(button);
-                                            root.addView(element_layout);
+                                            createSelection(button, element_config, index);
+                                            element_container.addView(textview);
+                                            element_container.addView(button);
+                                            content_container.addView(element_container);
                                             break;
                                         case "multiselection":
-                                            // Установка имени элемента
-                                            setName(textview, element, params);
+                                            setName(element_config, name_container, element_container);
+                                            button = new Button(ctx);
+                                            button.setAllCaps(false);
                                             // Установка кнопки элемента
-                                            setButton(button, element);
+                                            setButton(element_config, button, index);
                                             // Создание диалога мультиселектора
-                                            createMultiSelection(button, element, index);
-                                            element_layout.addView(textview);
-                                            element_layout.addView(button);
-                                            root.addView(element_layout);
+                                            createMultiSelection(button, element_config, index);
+                                            element_container.addView(textview);
+                                            element_container.addView(button);
+                                            content_container.addView(element_container);
                                             break;
                                         default:
-                                            Logger.Log("[SimpleMenuAPI] Create: Unknown element '" + element.type + "'. Expected one of: " + Object.keys(SCHEMA.elements.properties).join(", "), "WARNING");
+                                            Logger.Log("[SimpleMenuAPI] show(): Unknown element '" + element.type + "'. Expected one of: " + Object.keys(SCHEMA.elements.properties).join(", "), "WARNING");
                                     };
                                 };
                                 
@@ -1021,27 +1096,35 @@ let SimpleMenu = {
                                 // dialog.setTitleSize(config.menu.titleSize); //пока неизвестно нужно ли это
                                 // config.menu.titleColor !== dialog.setTitleColor(config.menu.titleColor);
                                 dialog.setView(menu_container);
-                                //Установка положительной кнопки
-                                element.menu.positiveButton === "object" && setDialogPositiveButton(dialog, config.menu, index);
-                                //Установка негативной кнопки
-                                element.menu.negativeButton === "object" && setDialogNegativeButton(dialog, config.menu, index);
-                                //Установка нейтральной кнопки
-                                element.menu.neutralButton === "object" && setDialogNeutralButton(dialog, config.menu, index);
+                                // Установление способов закрытия меню
+                                setClosable(config.menu, dialog, -1, true);
                                 //Установка анимации и запуск меню
                                 dialog.show()
                                     .getWindow()
                                     .getDecorView()
                                     .getChildAt(0)
-                                    .startAnimation(android.view.animation.AnimationUtils.loadAnimation(d.getContext(), config.menu.drawing.animation));
+                                    .startAnimation(android.view.animation.AnimationUtils.loadAnimation(d.getContext(), config.drawing.animation));
                             } catch(err) {
-                                throw new Error("[SimpleMenuAPI] Create: Unknown error!\n" + err);
+                                throw new Error("[SimpleMenuAPI] show(): Unknown error!\n" + err);
                             };
                         }
                     })
                 );
             },
-            update: function() {},
-            close: function() {}
+            update: function() {
+                try {
+                    
+                } catch(err) {
+                    throw new Error("[SimpleMenuAPI] update(): Unknown error!\n" + err);
+                }
+            },
+            close: function() {
+                try {
+                    
+                } catch(err) {
+                    throw new Error("[SimpleMenuAPI] close(): Unknown error!\n" + err);
+                }
+            }
         };
     }
 }
