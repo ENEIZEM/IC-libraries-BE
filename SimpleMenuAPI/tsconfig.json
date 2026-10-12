@@ -1,20 +1,19 @@
 {
     "compilerOptions": {
-        "target": "ES5",
         "lib": ["ESNext"],
         "allowJs": true,
         "checkJs": false,
         "strict": false,
         "skipLibCheck": true,
-        "noEmit":true,
-        "ignoreDeprecations": "6.0",
+        "noEmit":true
     },
     "exclude": [],
     "include": [
-        "SimpleMenuAPI.js"
+        "**/*.js"
     ],
     "files": [
         "../../toolchain/declarations/core-engine.d.ts",
-        "../../toolchain/declarations/android.d.ts"
+        "../../toolchain/declarations/android.d.ts",
+        "../../toolchain/declarations/ColorHelperLib.d.ts"
     ]
 }

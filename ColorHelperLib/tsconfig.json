@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "lib": ["ESNext"],
+        "allowJs": true,
+        "checkJs": false,
+        "strict": false,
+        "skipLibCheck": true,
+        "noEmit":true
+    },
+    "include": [
+        "**/*.js"
+    ],
+    "files": [
+        "../../toolchain/declarations/core-engine.d.ts",
+        "../../toolchain/declarations/android.d.ts"
+    ]
+}
