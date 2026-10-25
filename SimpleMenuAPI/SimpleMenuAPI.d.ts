@@ -1,12 +1,17 @@
-/// <reference path="../ColorHelperLib/ColorHelperLib.d.ts" />
+/// <reference path="../../toolchain/declarations/android.d.ts" />
+/// <reference path="../../toolchain/declarations/core-engine.d.ts" />
+/// <reference path="../../toolchain/declarations/ColorHelperLib.d.ts" />
 
 /**
  * SimpleMenuAPI — a small declarative library for building Android-dialog-style
  * menus in the Rhino / Inner Core environment.
  *
- * The library exposes a single global `SimpleMenu`. Call
- * {@link SimpleMenu.Create} with a full menu schema to get a
- * {@link SimpleMenu.CreatedMenu} handle, then call `.show()`.
+ * The library exposes three globals:
+ * - {@link SimpleMenu}      — main API (`Create`, geometry helpers, `deepClone`, `deepEqual`);
+ * - {@link AttributesReader} — helpers for reading colors/strings from an Android theme
+ *                              (also exported, since some mods reuse them);
+ * - {@link ValuesCache}     — internal per-context caches (exposed for debugging /
+ *                              manual invalidation via {@link ValuesCache.clearCache}).
  *
  * ## Example
  * ```js
@@ -15,7 +20,9 @@
  *   elements: [
  *     { type: "switch", name: "Sound", state: true,
  *       onSwitch: (sw, v) => log("sound = " + v) },
- *     { type: "button", name: "Restart", buttonText: "Go" }
+ *     { type: "section", subtitle: "Advanced", elements: [
+ *         { type: "button", name: "Restart", buttonText: "Go" }
+ *     ]}
  *   ]
  * });
  * menu.show();
@@ -23,11 +30,12 @@
  *
  * ## Two behaviour models
  * - **Reactive** (`isReactivePattern: true`, default): every interaction
- *   updates the live config immediately. The positive button is optional
- *   (typically used as a plain "close").
+ *   updates the live config immediately.
  * - **Transactional** (`isReactivePattern: false`): interactions mutate a
  *   draft; the live config is only replaced when the positive button is
- *   pressed. In this mode `positiveButton` is **required**.
+ *   pressed. In this mode `positiveButton` is **strongly recommended**
+ *   (though, due to current schema defaults, the runtime will auto-create
+ *   one even if omitted — but you should provide `onClick` for control).
  *
  * @see https://github.com/ENEIZEM/IC-libraries-BE
  */
@@ -57,14 +65,16 @@ declare namespace SimpleMenu {
   type Alignment = "LEFT" | "RIGHT" | "CENTRE";
 
   /**
-   * Gradient direction keyword for separator lines. Corresponds to
-   * `android.graphics.drawable.GradientDrawable.Orientation.*`.
+   * Dialog theme preset keyword. Mapped by the library to `android.R.style.*`
+   * values:
+   *  - `"Default"`        → `Theme_DeviceDefault_Dialog`
+   *  - `"Default_Light"`  → `Theme_DeviceDefault_Light_Dialog`
+   *  - `"Material"`       → `Theme_Material_Dialog`
+   *  - `"Material_Light"` → `Theme_Material_Light_Dialog`
+   *
+   * @defaultValue `"Default"`
    */
-  type GradientDirection =
-    | "TOP_BOTTOM" | "TR_BL"
-    | "RIGHT_LEFT" | "BR_TL"
-    | "BOTTOM_TOP" | "BL_TR"
-    | "LEFT_RIGHT" | "TL_BR";
+  type MenuStyle = "Default" | "Default_Light" | "Material" | "Material_Light";
 
   // =========================================================================
   //  Global functions
@@ -83,8 +93,8 @@ declare namespace SimpleMenu {
    * @returns A menu handle. Call `.show()` to display the dialog.
    *
    * @throws If the schema fails validation: unknown element type, wrong value
-   *   type, missing required parameter, transactional mode without a
-   *   positive button, etc.
+   *   type, missing required parameter, non-object `elements` inside a
+   *   section, nested sections, etc.
    *
    * @example
    * ```js
@@ -163,22 +173,13 @@ declare namespace SimpleMenu {
   function pxToSp(px: number, context?: any): number;
 
   /**
-   * Resolves the most appropriate localized Android system string.
+   * Returns the raw, internal schema descriptor used by `Create`.
    *
-   * Iterates over `candidateKeys` in order, using the current system locale.
-   * If no localized variant matches, an English locale is tried; if that
-   * also fails, `defaultText` is returned.
-   *
-   * Results are cached per "locale + key set" for the lifetime of the script.
-   *
-   * @param candidateKeys - Non-empty list of keys for the resource being searched in order of priority (e.g. `["reset_default", "reset", "revert", "clear"]`).
-   * @param defaultText - Fallback returned if no key resolves.
-   * @returns Localized string, English fallback, or `defaultText`.
-   *
-   * @throws If `candidateKeys` is not a non-empty array of strings, or if
-   *   `defaultText` is not a string.
+   * @remarks Primarily for debugging. The shape is an implementation detail
+   *   and may change between versions.
+   * @returns The internal schema object.
    */
-  function getSystemText(candidateKeys: string[], defaultText: string): string;
+  function _SCHEMA(): any;
 
   // =========================================================================
   //  Menu handle
@@ -268,10 +269,8 @@ declare namespace SimpleMenu {
 
   /** Fields shared by both behaviour models. */
   interface MenuConfigCommon {
-    /** Menu title text.
-     * @defaultValue The name of the mod. if it is not known, the mod folder name is used`
-     */
-    title?: string;
+    /** Menu title text. */
+    title: string;
 
     /** Title layout parameters. If omitted, defaults are used. */
     titleParam?: TitleParams;
@@ -290,7 +289,14 @@ declare namespace SimpleMenu {
      */
     dialogAlignment?: Alignment;
 
-    /** Negative button. If `null`/omitted, the button is not shown. */
+    /**
+     * Negative ("Cancel"-style) button.
+     *
+     * @remarks Since schema v2 the runtime **auto-creates** this object if
+     *   omitted, so the button is effectively always shown. Pass `null`
+     *   explicitly (or an object with `onClick: null`) if you truly want
+     *   a no-op cancel, or override `text` / `onClick` as needed.
+     */
     negativeButton?: NegativeButton | null;
 
     /** Neutral button. If `null`/omitted, the button is not shown. */
@@ -307,7 +313,13 @@ declare namespace SimpleMenu {
     /** @defaultValue `true` */
     isReactivePattern?: true;
 
-    /** Optional positive button. */
+    /**
+     * Positive ("OK"-style) button.
+     *
+     * @remarks Auto-created by the runtime if omitted. In reactive mode
+     *   this button typically just closes the dialog; provide `onClick` if
+     *   you need custom logic on top of that.
+     */
     positiveButton?: PositiveButton | null;
   }
 
@@ -315,13 +327,16 @@ declare namespace SimpleMenu {
    * Transactional model.
    *
    * User interactions mutate a draft; the live config is only replaced when
-   * the positive button is pressed. Therefore the positive button is
-   * **required** in this mode.
+   * the positive button is pressed. Therefore the positive button is the
+   * commit trigger — provide `onClick` if you need any side effects.
    */
   interface MenuConfigTransactional extends MenuConfigCommon {
     isReactivePattern: false;
 
-    /** Required in transactional mode. */
+    /**
+     * Commit button. Auto-created if omitted, but you should normally
+     * provide it so you can react to the commit.
+     */
     positiveButton: PositiveButton;
   }
 
@@ -337,16 +352,16 @@ declare namespace SimpleMenu {
    */
   interface DrawingConfig {
     /**
-     * Android theme resource used for the dialog.
-     * @defaultValue `android.R.style.Theme_DeviceDefault_Light_Dialog`
+     * Corner radius of the dialog and per-element cards, in dp.
+     * @defaultValue `28`
      */
-    menuStyle?: number;
+    cornerRadius?: Dimension;
 
     /**
-     * Android animation resource applied when the dialog is shown.
-     * @defaultValue `android.R.anim.fade_in`
+     * Android theme preset used for the dialog.
+     * @defaultValue `"Default"`
      */
-    animation?: number;
+    menuStyle?: MenuStyle;
 
     /**
      * Dim the activity behind the dialog.
@@ -362,7 +377,7 @@ declare namespace SimpleMenu {
 
     /**
      * Horizontal padding inside the dialog, in dp.
-     * @defaultValue `24`
+     * @defaultValue `12`
      */
     paddingHorizontal?: Dimension;
 
@@ -376,7 +391,7 @@ declare namespace SimpleMenu {
 
     /**
      * Title color.
-     * @defaultValue `null` — resolved from the theme
+     * @defaultValue `null` — resolved from the current theme
      *   (`windowTitleStyle` → `textColorPrimary` → `textColor`).
      */
     titleColor?: ColorHelper.Color | null;
@@ -386,6 +401,26 @@ declare namespace SimpleMenu {
      * @defaultValue `"CENTRE"`
      */
     titleAlignment?: Alignment;
+
+    // ---- Section subtitles ----
+
+    /**
+     * Section subtitle text size, in sp.
+     * @defaultValue `14`
+     */
+    subtitleSize?: Dimension;
+
+    /**
+     * Section subtitle color.
+     * @defaultValue `null` — resolved from the theme's accent color.
+     */
+    subtitleColor?: ColorHelper.Color | null;
+
+    /**
+     * Section subtitle alignment.
+     * @defaultValue `"LEFT"`
+     */
+    subtitleAlignment?: Alignment;
 
     // ---- Element names ----
 
@@ -397,7 +432,7 @@ declare namespace SimpleMenu {
 
     /**
      * Element name color.
-     * @defaultValue `null` — the theme's default text color is used.
+     * @defaultValue `null` — resolved from the theme's primary text color.
      */
     nameColor?: ColorHelper.Color | null;
 
@@ -411,30 +446,9 @@ declare namespace SimpleMenu {
 
     /**
      * Element button label text color.
-     * @defaultValue `null`
+     * @defaultValue `null` — resolved from the theme's primary text color.
      */
     buttonTextColor?: ColorHelper.Color | null;
-
-    // ---- Separators ----
-
-    /**
-     * Default separator colors. A single color produces a solid line; a
-     * non-empty array produces a gradient.
-     * @defaultValue `android.graphics.Color.GRAY`
-     */
-    separatorColor?: ColorHelper.Color | NonEmptyArray<ColorHelper.Color>;
-
-    /**
-     * Default separator thickness, in dp.
-     * @defaultValue `2`
-     */
-    separatorHeight?: Dimension;
-
-    /**
-     * Default separator gradient direction.
-     * @defaultValue `"LEFT_RIGHT"`
-     */
-    separatorGradientDirection?: GradientDirection;
   }
 
   // =========================================================================
@@ -452,7 +466,8 @@ declare namespace SimpleMenu {
     text: string;
 
     /**
-     * Hint text color. (In practice mostly affects the symbol color.)
+     * Hint text color. (In practice, only the symbol color is affected
+     * visibly.)
      * @defaultValue Inherited from {@link DrawingConfig.nameColor}.
      */
     textColor?: ColorHelper.Color;
@@ -529,8 +544,11 @@ declare namespace SimpleMenu {
      * @param builder - The `android.app.AlertDialog.Builder` used to build
      *   the dialog. Note: this is a **builder**, not the built dialog,
      *   despite the historical parameter name.
-     * @param elementIndex - Index of the element in `elements` for element
-     *   dialogs, or `-1` for the main menu dialog.
+     * @param elementIndex - Unique numeric identifier of the element that
+     *   owns this dialog, or `-1` for the main menu dialog. Do not assume
+     *   contiguous numbering (sections consume an index without exposing
+     *   a callback of their own).
+     * @defaultValue `null`
      */
     onClick?: (builder: any, elementIndex: number) => void;
   }
@@ -554,8 +572,9 @@ declare namespace SimpleMenu {
      * @param dialogOrBuilder - On button press, the same
      *   `AlertDialog.Builder` as for positive. On cancel, the ready
      *   `android.app.AlertDialog` passed to `OnCancelListener`.
-     * @param elementIndex - Index of the element in `elements`, or `-1`
-     *   for the main menu dialog.
+     * @param elementIndex - Unique numeric identifier of the element that
+     *   owns this dialog, or `-1` for the main menu dialog.
+     * @defaultValue `null`
      */
     onClick?: (dialogOrBuilder: any, elementIndex: number) => void;
   }
@@ -565,7 +584,8 @@ declare namespace SimpleMenu {
     /**
      * Button label.
      * @defaultValue A localized "reset to default" string resolved via
-     *   {@link getSystemText}; fallback is `"Reset to default"`.
+     *   {@link AttributesReader.getSystemText}; fallback is
+     *   `"Reset to default"`.
      */
     text?: string;
 
@@ -573,8 +593,9 @@ declare namespace SimpleMenu {
      * Called when the button is pressed.
      *
      * @param builder - The `android.app.AlertDialog.Builder`.
-     * @param elementIndex - Index of the element in `elements`, or `-1`
-     *   for the main menu dialog.
+     * @param elementIndex - Unique numeric identifier of the element that
+     *   owns this dialog, or `-1` for the main menu dialog.
+     * @defaultValue `null`
      */
     onClick?: (builder: any, elementIndex: number) => void;
   }
@@ -635,7 +656,7 @@ declare namespace SimpleMenu {
      * Called when the "value button" is tapped.
      *
      * @param button - The tapped View.
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onButtonClick?: ((button: any, elementIndex: number) => void) | null;
@@ -671,7 +692,7 @@ declare namespace SimpleMenu {
      * Called when the button is tapped.
      *
      * @param button - The tapped View.
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onButtonClick?: ((button: any, elementIndex: number) => void) | null;
@@ -692,7 +713,7 @@ declare namespace SimpleMenu {
      *
      * @param switcher - The switch View.
      * @param isChecked - New state.
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onSwitch?:
@@ -715,7 +736,7 @@ declare namespace SimpleMenu {
      *
      * @param checkbox - The checkbox View.
      * @param isChecked - New state.
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onCheck?:
@@ -750,7 +771,7 @@ declare namespace SimpleMenu {
      * @param item - The View of the selected option.
      * @param position - Position of the option in the adapter.
      * @param itemId - Adapter item id (usually equals `position`).
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onSelect?:
@@ -793,7 +814,7 @@ declare namespace SimpleMenu {
      * @param position - Position of the option in the adapter.
      * @param isChecked - New selection state for this option.
      * @param itemId - Adapter item id (usually equals `position`).
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onItemSelect?:
@@ -810,7 +831,7 @@ declare namespace SimpleMenu {
     /**
      * Called when the dropdown is dismissed.
      *
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onDismissSpinner?: ((elementIndex: number) => void) | null;
@@ -836,7 +857,7 @@ declare namespace SimpleMenu {
      * @param startPos - Offset in the old text where replacement begins.
      * @param beforeCount - Number of characters being replaced.
      * @param afterCount - Number of characters replacing them.
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     beforeTextChange?:
@@ -856,7 +877,7 @@ declare namespace SimpleMenu {
      * @param startPos - Offset where the change starts.
      * @param beforeCount - Number of characters replaced.
      * @param afterCount - Number of characters replacing them.
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onTextChange?:
@@ -873,7 +894,7 @@ declare namespace SimpleMenu {
      * Called **after** the text change is applied.
      *
      * @param finalText - Resulting text.
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     afterTextChange?: ((finalText: string, elementIndex: number) => void) | null;
@@ -914,13 +935,13 @@ declare namespace SimpleMenu {
      */
     dialogAlignment?: Alignment;
 
-    /** Positive button. */
+    /** Positive button (auto-created if omitted). */
     positiveButton?: PositiveButton | null;
 
-    /** Neutral button. */
+    /** Neutral button (hidden if omitted). */
     neutralButton?: NeutralButton | null;
 
-    /** Negative button. */
+    /** Negative button (auto-created if omitted). */
     negativeButton?: NegativeButton | null;
   }
 
@@ -943,7 +964,7 @@ declare namespace SimpleMenu {
      * @param sb - The `SeekBar` View.
      * @param progress - New progress value.
      * @param fromUser - `true` if the change was initiated by the user.
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onProgressChange?:
@@ -955,7 +976,7 @@ declare namespace SimpleMenu {
      *
      * @param sb - The `SeekBar` View.
      * @param progress - Progress at touch start.
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onStartTrackingTouch?:
@@ -967,7 +988,7 @@ declare namespace SimpleMenu {
      *
      * @param sb - The `SeekBar` View.
      * @param progress - Progress at release.
-     * @param elementIndex - Index of this element in `elements`.
+     * @param elementIndex - Unique numeric identifier of this element.
      * @defaultValue `null`
      */
     onStopTrackingTouch?:
@@ -1022,70 +1043,299 @@ declare namespace SimpleMenu {
      */
     dialogAlignment?: Alignment;
 
-    /** Positive button. */
+    /** Positive button (auto-created if omitted). */
     positiveButton?: PositiveButton | null;
 
-    /** Neutral button. */
+    /** Neutral button (hidden if omitted). */
     neutralButton?: NeutralButton | null;
 
-    /** Negative button. */
+    /** Negative button (auto-created if omitted). */
     negativeButton?: NegativeButton | null;
   }
 
   /**
-   * Visual separator. If `name` is set, the line is drawn together with a
-   * label; otherwise it is just a full-width line.
+   * Visual grouping of elements under an optional subtitle.
+   *
+   * A section renders its children as a stack of per-element cards,
+   * surrounded by a rounded background. Nesting sections is not allowed —
+   * a nested `section` will fail validation with an error.
    */
-  interface SeparatorElement {
-    type: "separator";
-
-    /** Separator label. @defaultValue `null` (a plain line, no label) */
-    name?: string | null;
+  interface SectionElement {
+    type: "section";
 
     /**
-     * Label size, in sp.
-     * @defaultValue Inherited from {@link DrawingConfig.nameSize}.
+     * Subtitle shown above the section's children. If `null`/omitted, the
+     * section renders without a header.
+     * @defaultValue `null`
      */
-    nameSize?: Dimension;
+    subtitle?: string | null;
 
     /**
-     * Label color.
-     * @defaultValue Inherited from {@link DrawingConfig.nameColor}.
+     * Subtitle text size, in sp.
+     * @defaultValue Inherited from {@link DrawingConfig.subtitleSize}.
      */
-    nameColor?: ColorHelper.Color;
+    subtitleSize?: Dimension;
 
     /**
-     * Line gradient direction.
-     * @defaultValue Inherited from {@link DrawingConfig.separatorGradientDirection}.
+     * Subtitle color.
+     * @defaultValue Inherited from {@link DrawingConfig.subtitleColor}.
      */
-    lineGradientDirection?: GradientDirection;
+    subtitleColor?: ColorHelper.Color;
 
     /**
-     * Line colors: single color for a solid line, non-empty array for a
-     * gradient.
-     * @defaultValue Inherited from {@link DrawingConfig.separatorColor}.
+     * Subtitle alignment.
+     * @defaultValue Inherited from {@link DrawingConfig.subtitleAlignment}.
      */
-    lineColor?: ColorHelper.Color | NonEmptyArray<ColorHelper.Color>;
+    subtitleAlignment?: Alignment;
 
     /**
-     * Line thickness, in dp.
-     * @defaultValue Inherited from {@link DrawingConfig.separatorHeight}.
+     * Child elements. Sections are not allowed inside (runtime will error
+     * out). If omitted or empty, the section renders as an empty card
+     * (with just the subtitle, if any) and a warning is emitted.
      */
-    lineHeight?: Dimension;
+    elements?: NonEmptyArray<ElementWithoutSection>;
   }
 
   // =========================================================================
   //  Union
   // =========================================================================
 
-  /** Any element allowed in `MenuSchema.elements`. */
-  type MenuElement =
+  /** Any non-section element allowed inside `elements` or a section. */
+  type ElementWithoutSection =
     | ButtonElement
     | SwitchElement
     | CheckboxElement
     | SelectionElement
     | MultiselectionElement
     | EditTextElement
-    | SeekBarElement
-    | SeparatorElement;
+    | SeekBarElement;
+
+  /** Any element allowed at the root of `MenuSchema.elements`. */
+  type MenuElement = ElementWithoutSection | SectionElement;
+}
+
+/**
+ * Helper namespace for reading localized Android strings and resolving
+ * theme attributes (colors, dimensions, drawables) with per-`Context`
+ * caching.
+ *
+ * Mostly useful when you write custom mod UI and want the same look-and-feel
+ * as SimpleMenu's built-in widgets.
+ *
+ * @example
+ * ```js
+ * const ctx = new android.view.ContextThemeWrapper(
+ *     UI.getContext(),
+ *     android.R.style.Theme_DeviceDefault_Dialog
+ * );
+ * const accent = AttributesReader.getAccentColor(ctx, 0xFF00AAFF);
+ * ```
+ */
+declare namespace AttributesReader {
+
+  /**
+   * Resolves a theme attribute to a concrete value.
+   *
+   * @param ctx - Android `Context` (usually a `ContextThemeWrapper`).
+   * @param attrId - Attribute id, e.g. `android.R.attr.colorAccent`.
+   * @param fallback - Value returned if the attribute cannot be resolved.
+   * @param valueType - One of `"color"`, `"dimension"`, `"resourceId"`,
+   *   `"drawable"`. Any other value is returned as raw `typedValue.data`.
+   * @returns The resolved value (type depends on `valueType`), or
+   *   `fallback` if resolution fails.
+   */
+  function getThemeValue(
+    ctx: any,
+    attrId: any,
+    fallback: any,
+    valueType: "color" | "dimension" | "resourceId" | "drawable" | string,
+  ): any;
+
+  /**
+   * Resolves a theme attribute to an ARGB color int, with per-`Context`
+   * caching under `cacheKey`.
+   *
+   * @param ctx - Android `Context`.
+   * @param attrId - Attribute id, e.g. `android.R.attr.colorAccent`.
+   * @param fallback - Value returned if the attribute cannot be resolved.
+   * @param cacheKey - Cache key (must be unique per attribute within a
+   *   context).
+   * @returns ARGB color int, or `fallback`.
+   */
+  function getThemeColor(ctx: any, attrId: any, fallback: any, cacheKey: string): any;
+
+  /**
+   * Resolves a color from a *style* resource (not from the theme directly).
+   * Used, for example, to read `windowTitleStyle`'s `textColor`.
+   *
+   * @param ctx - Android `Context`.
+   * @param styleAttrId - Attribute that references a style, e.g.
+   *   `android.R.attr.windowTitleStyle`.
+   * @param styleAttrValue - Attribute *inside* that style to read, e.g.
+   *   `android.R.attr.textColor`.
+   * @param fallback - Value returned if resolution fails.
+   * @param cacheKey - Cache key (may be `null` to disable caching).
+   * @returns ARGB color int, or `fallback`.
+   */
+  function getColorFromStyle(
+    ctx: any,
+    styleAttrId: any,
+    styleAttrValue: any,
+    fallback: any,
+    cacheKey: string | null,
+  ): any;
+
+  /**
+   * Resolves the dialog title color using a fallback chain:
+   * `windowTitleStyle.textColor` → `textColorPrimary` → `textColor` →
+   * `fallback`.
+   *
+   * @param ctx - Android `Context`.
+   * @param fallback - Last-resort value.
+   * @returns ARGB color int.
+   */
+  function getDialogTitleColor(ctx: any, fallback: any): any;
+
+  /**
+   * Resolves `android.R.attr.textColorPrimary`.
+   *
+   * @param ctx - Android `Context`.
+   * @param fallback - Value returned if the attribute is missing.
+   * @returns ARGB color int.
+   */
+  function getPrimaryTextColor(ctx: any, fallback: any): any;
+
+  /**
+   * Resolves `android.R.attr.textColorSecondary`.
+   *
+   * @param ctx - Android `Context`.
+   * @param fallback - Value returned if the attribute is missing.
+   * @returns ARGB color int.
+   */
+  function getSecondaryTextColor(ctx: any, fallback: any): any;
+
+  /**
+   * Resolves `android.R.attr.colorAccent`.
+   *
+   * @param ctx - Android `Context`.
+   * @param fallback - Value returned if the attribute is missing.
+   * @returns ARGB color int.
+   */
+  function getAccentColor(ctx: any, fallback: any): any;
+
+  /**
+   * Resolves `android.R.attr.colorPrimary`.
+   *
+   * @param ctx - Android `Context`.
+   * @param fallback - Value returned if the attribute is missing.
+   * @returns ARGB color int.
+   */
+  function getPrimaryColor(ctx: any, fallback: any): any;
+
+  /**
+   * Resolves `android.R.attr.colorPrimaryDark`.
+   *
+   * @param ctx - Android `Context`.
+   * @param fallback - Value returned if the attribute is missing.
+   * @returns ARGB color int.
+   */
+  function getPrimaryDarkColor(ctx: any, fallback: any): any;
+
+  /**
+   * Best-effort color extraction from a Drawable.
+   *
+   * Handles `ColorDrawable`, `GradientDrawable`, `InsetDrawable` (recurses),
+   * and `LayerDrawable` (returns the topmost non-transparent layer color).
+   *
+   * @param d - Drawable instance (or `null`/`undefined`).
+   * @returns ARGB color int, or `null` if nothing usable was found.
+   */
+  function extractColorFromDrawable(d: any): number | null;
+
+  /**
+   * Resolves `android.R.attr.windowBackground` to a Drawable (cached).
+   *
+   * @param ctx - Android `Context`.
+   * @returns Drawable, or `null` if unresolved.
+   */
+  function getWindowBackground(ctx: any): any;
+
+  /**
+   * Resolves the solid color of `windowBackground`.
+   *
+   * @param ctx - Android `Context`.
+   * @param fallback - Value returned if the background is not a solid color
+   *   drawable.
+   * @returns ARGB color int, or `fallback`.
+   */
+  function getWindowBackgroundColor(ctx: any, fallback: any): any;
+
+  /**
+   * Resolves the most appropriate localized Android system string.
+   *
+   * Iterates over `candidateKeys` in order, using the current system locale.
+   * If no localized variant matches, an English locale is tried; if that
+   * also fails, `defaultText` is returned.
+   *
+   * Results are cached per "locale + key set" for the lifetime of the script.
+   *
+   * @param candidateKeys - Non-empty list of keys for the resource being searched in order of priority (e.g. `["reset_default", "reset", "revert", "clear"]`).
+   * @param defaultText - Fallback returned if no key resolves.
+   * @returns Localized string, English fallback, or `defaultText`.
+   *
+   * @throws If `candidateKeys` is not a non-empty array of strings, or if
+   *   `defaultText` is not a string.
+   */
+  function getSystemText(candidateKeys: string[], defaultText: string): string;
+}
+
+/**
+ * Internal cache storage used by {@link AttributesReader} and SimpleMenu.
+ *
+ * Exposed mainly for debugging or for manually invalidating caches when you
+ * change the system configuration at runtime (e.g. switch light/dark theme
+ * without recreating the activity).
+ */
+declare namespace ValuesCache {
+  /**
+   * Per-`Context` cache of resolved theme colors. Keyed by
+   * `System.identityHashCode(ctx)`, then by an internal cache key.
+   *
+   * @internal
+   */
+  let themeColor: Record<string, any>;
+
+  /**
+   * Per-`Context` cache of resolved style values (e.g. title colors, window
+   * background drawables). Keyed by `System.identityHashCode(ctx)`, then by
+   * an internal cache key.
+   *
+   * @internal
+   */
+  let themeStyle: Record<string, any>;
+
+  /**
+   * Cache of resolved localized system strings. Keyed by
+   * `"<lang>|<comma-separated keys>"`.
+   *
+   * @internal
+   */
+  let defaultText: Record<string, string>;
+
+  /**
+   * Last measured width (in pixels) of the main dialog, used to align
+   * element dialogs with the main menu. `0` means "not measured yet".
+   *
+   * @internal
+   */
+  let mainDialogWight: number;
+
+  /**
+   * Clears all caches and resets {@link mainDialogWight} to `0`.
+   *
+   * Call this if you changed the system theme/locale at runtime and want
+   * `AttributesReader` / SimpleMenu to re-resolve theme-dependent values
+   * on the next call.
+   */
+  function clearCache(): void;
 }

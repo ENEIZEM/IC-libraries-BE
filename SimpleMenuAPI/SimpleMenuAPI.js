@@ -1,4 +1,6 @@
-// @ts-check
+/// <reference path="../../toolchain/declarations/android.d.ts" />
+/// <reference path="../../toolchain/declarations/core-engine.d.ts" />
+/// <reference path="../../toolchain/declarations/ColorHelperLib.d.ts" />
 /*
     SimpleMenuAPI by ENEIZEM and UhmDenis.
     SimpleMenuAPI provides simple methods for creating Android dialog menus.
@@ -22,13 +24,219 @@ LIBRARY({
     dependencies: ["ColorHelperLib"]
 });
 
-IMPORT("ColorHelperLib"); 
+IMPORT("ColorHelperLib");
 
-var _defaultTextCache = Object.create(null);
-// var _MainMenuWidhtCache;
-// var _Cache;
+let ValuesCache = {
+    themeColor: Object.create(null),
+    themeStyle: Object.create(null),
+    defaultText: Object.create(null),
+    mainDialogWight: 0,
+    clearCache: function() {
+        ValuesCache.themeColor = Object.create(null);
+        ValuesCache.themeStyle = Object.create(null);
+        ValuesCache.defaultText = Object.create(null);
+        ValuesCache.mainDialogWight = 0;
+    }
+};
 
-let SimpleMenu = {
+let AttributesReader = {
+    getThemeValue: function(ctx, attrId, fallback, valueType) {
+        var typedValue = new android.util.TypedValue();
+        var theme = ctx.getTheme();
+
+        var ok = theme.resolveAttribute(attrId, typedValue, true);
+        if (!ok) ok = theme.resolveAttribute(attrId, typedValue, true);
+        if (!ok) return fallback;
+
+        switch (valueType) {
+            case 'color':
+                if (typedValue.resourceId !== 0) {
+                    return ctx.getResources().getColor(typedValue.resourceId, ctx.getTheme());
+                }
+                return typedValue.data;
+
+            case 'dimension':
+                if (typedValue.resourceId !== 0) {
+                    return ctx.getResources().getDimensionPixelSize(typedValue.resourceId);
+                }
+                return typedValue.getDimension(ctx.getResources().getDisplayMetrics());
+
+            case 'resourceId':
+                return typedValue.resourceId !== 0 ? typedValue.resourceId : fallback;
+
+            case 'drawable':
+                if (typedValue.resourceId !== 0) {
+                    return ctx.getResources().getDrawable(typedValue.resourceId, ctx.getTheme());
+                }
+                return fallback;
+
+            default:
+                return typedValue.data;
+        }
+    },
+
+    getThemeColor: function(ctx, attrId, fallback, cacheKey) {
+        var contextId = java.lang.System.identityHashCode(ctx);
+        var perContext = ValuesCache.themeColor[contextId];
+        if (perContext && perContext[cacheKey] !== undefined) {
+            return perContext[cacheKey];
+        }
+
+        var resolved = AttributesReader.getThemeValue(ctx, attrId, null, 'color');
+        if (resolved === null) return fallback;
+
+        if (!perContext) {
+            perContext = Object.create(null);
+            ValuesCache.themeColor[contextId] = perContext;
+        }
+        perContext[cacheKey] = resolved;
+        return resolved;
+    },
+
+    getColorFromStyle: function(ctx, styleAttrId, styleAttrValue, fallback, cacheKey) {
+        var contextId = java.lang.System.identityHashCode(ctx);
+        var perContext = ValuesCache.themeStyle[contextId];
+        if (perContext && cacheKey && perContext[cacheKey] !== undefined) {
+            return perContext[cacheKey];
+        }
+
+        var styleId = AttributesReader.getThemeValue(ctx, styleAttrId, 0, 'resourceId');
+        var resolved = null;
+
+        if (styleId !== 0) {
+            var ta = ctx.obtainStyledAttributes(styleId, [styleAttrValue]);
+            try {
+                if (ta.hasValue(0)) {
+                    resolved = ta.getColor(0, -1);
+                }
+            } finally {
+                ta.recycle();
+            }
+        }
+
+        if (resolved === null) return fallback;
+
+        if (cacheKey) {
+            if (!perContext) {
+                perContext = Object.create(null);
+                ValuesCache.themeStyle[contextId] = perContext;
+            }
+            perContext[cacheKey] = resolved;
+        }
+        return resolved;
+    },
+
+    getDialogTitleColor: function(ctx, fallback) {
+        var titleColor = AttributesReader.getColorFromStyle(
+            ctx,
+            android.R.attr.windowTitleStyle,
+            android.R.attr.textColor,
+            null,
+            'dialogTitle'
+        );
+        if (titleColor !== null) return titleColor;
+
+        var primaryColor = AttributesReader.getThemeColor(
+            ctx, android.R.attr.textColorPrimary, null, 'titleFallbackPrimary'
+        );
+        if (primaryColor !== null) return primaryColor;
+
+        return AttributesReader.getThemeColor(
+            ctx, android.R.attr.textColor, fallback, 'titleFallbackText'
+        );
+    },
+
+    getPrimaryTextColor: function(ctx, fallback) {
+        return AttributesReader.getThemeColor(
+            ctx, android.R.attr.textColorPrimary, fallback, 'primaryText'
+        );
+    },
+
+    getSecondaryTextColor: function(ctx, fallback) {
+        return AttributesReader.getThemeColor(
+            ctx, android.R.attr.textColorSecondary, fallback, 'secondaryText'
+        );
+    },
+
+    getAccentColor: function(ctx, fallback) {
+        return AttributesReader.getThemeColor(
+            ctx, android.R.attr.colorAccent, fallback, 'accent'
+        );
+    },
+
+    getPrimaryColor: function(ctx, fallback) {
+        return AttributesReader.getThemeColor(
+            ctx, android.R.attr.colorPrimary, fallback, 'primary'
+        );
+    },
+
+    getPrimaryDarkColor: function(ctx, fallback) {
+        return AttributesReader.getThemeColor(
+            ctx, android.R.attr.colorPrimaryDark, fallback, 'primaryDark'
+        );
+    },
+
+    extractColorFromDrawable: function(d) {
+        if (d === null || d === undefined) return null;
+
+        if (d instanceof android.graphics.drawable.ColorDrawable) {
+            return d.getColor();
+        }
+
+        if (d instanceof android.graphics.drawable.GradientDrawable) {
+            try {
+                var cs = d.getColor();
+                if (cs !== null) return cs.getDefaultColor();
+            } catch (e) {}
+            return null;
+        }
+
+        if (d instanceof android.graphics.drawable.InsetDrawable) {
+            try {
+                return AttributesReader.extractColorFromDrawable(d.getDrawable());
+            } catch (e) {
+                return null;
+            }
+        }
+
+        if (d instanceof android.graphics.drawable.LayerDrawable) {
+            var n = d.getNumberOfLayers();
+            for (var i = n - 1; i >= 0; i--) {
+                var c = AttributesReader.extractColorFromDrawable(d.getDrawable(i));
+                if (c !== null) return c;
+            }
+            return null;
+        }
+
+        return null;
+    },
+
+    getWindowBackground: function(ctx) {
+        var contextId = java.lang.System.identityHashCode(ctx);
+        var perContext = ValuesCache.themeStyle[contextId];
+        if (perContext && perContext.windowBg !== undefined) {
+            return perContext.windowBg;
+        }
+
+        var d = AttributesReader.getThemeValue(ctx, android.R.attr.windowBackground, null, 'drawable');
+        if (d === null) return null;
+
+        if (!perContext) {
+            perContext = Object.create(null);
+            ValuesCache.themeStyle[contextId] = perContext;
+        }
+        perContext.windowBg = d;
+        return d;
+    },
+
+    getWindowBackgroundColor: function(ctx, fallback) {
+        var d = AttributesReader.getWindowBackground(ctx);
+        if (d === null) return fallback;
+
+        var c = AttributesReader.extractColorFromDrawable(d);
+        return c !== null ? c : fallback;
+    },
+
     getSystemText: function(candidateKeys, defaultText) {
         if (!(Array.isArray(candidateKeys) && candidateKeys.length > 0 && candidateKeys.every(function (item) { return typeof item === "string" }))) {
             throw new Error ("[SimpleMenu] getSystemDefaultText(): candidateKeys must be a non-empty string array");
@@ -40,7 +248,7 @@ let SimpleMenu = {
         try {
             systemRes = android.content.res.Resources.getSystem();
         } catch (e) {
-            Logger.Log("[SimpleMenu] getSystemDefaultText(): cannot get system resources: " + e, "WARNING");
+            Logger.Log("[SimpleMenu] getSystemDefaultText(): cannot get system resources:\n" + e, "WARNING");
             return defaultText;
         }
         var currentLocale = null;
@@ -54,11 +262,11 @@ let SimpleMenu = {
             } catch (e) {}
             if (currentLocale === null) currentLocale = config.locale || java.util.Locale.getDefault();
         } catch (e) {
-            Logger.Log("[SimpleMenuAPI] getSystemDefaultText(): cannot read configuration: " + e, "WARNING");
+            Logger.Log("[SimpleMenuAPI] getSystemDefaultText(): cannot read configuration:\n" + e, "WARNING");
         }
         var currentLang = (currentLocale !== null) ? currentLocale.getLanguage() : "en";
         var cacheKey = currentLang + "|" + candidateKeys.join(",");
-        if (_defaultTextCache[cacheKey] !== undefined) return _defaultTextCache[cacheKey];
+        if (ValuesCache.defaultText[cacheKey] !== undefined) return ValuesCache.defaultText[cacheKey];
         var enRes = null;
         if (currentLang !== "en") {
             try {
@@ -72,7 +280,7 @@ let SimpleMenu = {
                     }
                 }
             } catch (e) {
-                Logger.Log("[SimpleMenuAPI] getSystemDefaultText(): EN resources unavailable: " + e, "WARNING");
+                Logger.Log("[SimpleMenuAPI] getSystemDefaultText(): EN resources unavailable:\n" + e, "WARNING");
             }
         }
         var result = null;
@@ -110,10 +318,12 @@ let SimpleMenu = {
             }
         }
         if (result === null) result = englishFallback || defaultText;
-        _defaultTextCache[cacheKey] = result;
+        ValuesCache.defaultText[cacheKey] = result;
         return result;
     },
+};
 
+let SimpleMenu = {
     dpToPx: function (dp, context) {
         context = context || UI.getContext();
         let dm = context.getResources().getDisplayMetrics();
@@ -234,21 +444,25 @@ let SimpleMenu = {
             },
 
             drawing: {
+                cornerRadius:               { type: "number or numeric string", default: 28 },
                 dimBehind:                  { type: "boolean", default: true },
                 dialogAlignment:            { type: "alignment as a string",  default: "CENTRE" },
-                paddingHorizontal:          { type: "number or numeric string", default: 24 },
+                paddingHorizontal:          { type: "number or numeric string", default: 12 },
                 titleSize:                  { type: "number or numeric string", default: 20 },
                 titleColor:                 { type: "color",            default: null },
                 titleAlignment:             { type: "alignment as a string",  default: "CENTRE" },
-                menuStyle:                  { type: "number", default: android.R.style.Theme_DeviceDefault_Light_Dialog },
-                animation:                  { type: "number", default: android.R.anim.fade_in },
+                menuStyle:                  { type: "menu style as a string", default: "Default" },
                 nameSize:                   { type: "number or numeric string", default: 16 },
                 nameColor:                  { type: "color",  default: null },
                 buttonTextSize:             { type: "number or numeric string", default: 16 },
                 buttonTextColor:            { type: "color",  default: null },
-                separatorColor:             { type: "color or color[]",  default: android.graphics.Color.GRAY },
-                separatorHeight:            { type: "number or numeric string", default: 2 },
-                separatorGradientDirection: { type: "gradient direction as a string", default: "LEFT_RIGHT" }
+                // separatorColor:             { type: "color or color[]",  default: android.graphics.Color.GRAY },
+                // separatorHeight:            { type: "number or numeric string", default: 2 },
+                // separatorGradientDirection: { type: "gradient direction as a string", default: "LEFT_RIGHT" },
+                subtitleSize:                  { type: "number or numeric string", default: 14 },
+                subtitleColor:                 { type: "color",            default: null },
+                subtitleAlignment:             { type: "alignment as a string",  default: "LEFT" },
+                
             },
             
             SUB_SCHEMAS: {
@@ -266,7 +480,6 @@ let SimpleMenu = {
                 },
                 positiveButton: {
                     type: "object",
-                    default: null,
                     properties: {
                         text:    { type: "string", default: android.content.res.Resources.getSystem().getString(android.R.string.ok) },
                         onClick: { type: "function",  default: null }
@@ -274,7 +487,6 @@ let SimpleMenu = {
                 },
                 negativeButton: {
                     type: "object",
-                    default: null,
                     properties: {
                         text:    { type: "string", default: android.content.res.Resources.getSystem().getString(android.R.string.cancel) },
                         onClick: { type: "function", default: null  }
@@ -284,7 +496,7 @@ let SimpleMenu = {
                     type: "object",
                     default: null,
                     properties: {
-                        text:    { type: "string", default: SimpleMenu.getSystemText(["restore_default", "reset_to_default", "restore_defaults", "reset_default", "reset", "revert", "clear"], "Reset to default") },
+                        text:    { type: "string", default: AttributesReader.getSystemText(["restore_default", "reset_to_default", "restore_defaults", "reset_default", "reset", "revert", "clear"], "Reset to default") },
                         onClick: { type: "function", default: null  }
                     }
                 },
@@ -436,14 +648,22 @@ let SimpleMenu = {
                         hint:                           { $ref: "SUB_SCHEMAS.hint", default: null }
                     },
 
-                    separator: {
+                    // separator: {
+                    //     type:                  { type: "string" },
+                    //     name:                  { type: "string", default: null },
+                    //     nameSize:              { type: "number or numeric string", default: "drawing.nameSize" },
+                    //     nameColor:             { type: "color",  default: "drawing.nameColor" },
+                    //     lineGradientDirection: { type: "gradient direction as a string", default: "drawing.separatorGradientDirection" },
+                    //     lineColor:             { type: "color or color[]",  default: "drawing.separatorColor" },
+                    //     lineHeight:            { type: "number or numeric string", default: "drawing.separatorHeight" }
+                    // },
+                    section: {
                         type:                  { type: "string" },
-                        name:                  { type: "string", default: null },
-                        nameSize:              { type: "number or numeric string", default: "drawing.nameSize" },
-                        nameColor:             { type: "color",  default: "drawing.nameColor" },
-                        lineGradientDirection: { type: "gradient direction as a string", default: "drawing.separatorGradientDirection" },
-                        lineColor:             { type: "color or color[]",  default: "drawing.separatorColor" },
-                        lineHeight:            { type: "number or numeric string", default: "drawing.separatorHeight" }
+                        subtitle:              { type: "string", default: null },
+                        subtitleSize:          { type: "number or numeric string", default: "drawing.subtitleSize" },
+                        subtitleColor:         { type: "color",  default: "drawing.subtitleColor" },
+                        subtitleAlignment:     { type: "alignment as a string",  default: "drawing.subtitleAlignment" },   
+                        elements:              { type: "array", $external: true }
                     }
                 }
             }
@@ -473,18 +693,26 @@ let SimpleMenu = {
             RIGHT: android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL,
             CENTRE: android.view.Gravity.CENTER,
         };
+        var STYLES = {
+            Default_Light: android.R.style.Theme_DeviceDefault_Light_Dialog,
+            Default: android.R.style.Theme_DeviceDefault_Dialog,
+            Material_Light: android.R.style.Theme_Material_Light_Dialog,
+            Material: android.R.style.Theme_Material_Dialog
+        };
+        const POPUP_ANIM_MS = 150;
+
         let draft_config;
-        let isShown = false;
+        let isShown = false; 
 
         // Окно ошибок
         function reportValidation(errors, warnings) {
             if (errors.length === 0 && warnings.length === 0) return;
             if (errors.length > 0) {
-                var msg = "[SimpleMenuAPI] Create():\n  - " + errors.join("\n  - ");
+                var msg = "\n[SimpleMenuAPI] Create():\n  - " + errors.join("\n  - ");
                 if (warnings.length > 0) msg += "\n\nWarnings:\n  - " + warnings.join("\n  - ");
                 throw new Error(msg);
             }
-            Logger.Log("[SimpleMenuAPI] Create():\n  - " + warnings.join("\n  - "), "WARNING"
+            Logger.Log("\n[SimpleMenuAPI] Create():\n  - " + warnings.join("\n  - "), "WARNING"
             );
         }
 
@@ -522,6 +750,9 @@ let SimpleMenu = {
             if (expectedType === "alignment as a string") {
                 return typeof value === "string" && ALIGNMENTS[value] !== undefined;
             }
+            if (expectedType === "menu style as a string") {
+                return typeof value === "string" && STYLES[value] !== undefined;
+            }
             return typeof value === expectedType;
         }
 
@@ -549,7 +780,7 @@ let SimpleMenu = {
         }
 
         // Логическая валидация элементов
-        function sanitizeElementLogic(element, index) {
+        function sanitizeElementLogic(element, path) {
             if (!element) return element;
 
             if (element.type === "seekbar") {
@@ -558,7 +789,7 @@ let SimpleMenu = {
                 var current = element.seekBarDialog.current;
                 // Если min больше max — меняем их местами
                 if (min > max) {
-                    warnings.push("elements[" + index + "] (seekbar) 'min' (" + min + ") > 'max' (" + max + "). Swapping values.");
+                    warnings.push(path + " (seekbar) 'min' (" + min + ") > 'max' (" + max + "). Swapping values.");
                     element.seekBarDialog.min = max;
                     element.seekBarDialog.max = min;
                     min = element.seekBarDialog.min;
@@ -566,10 +797,10 @@ let SimpleMenu = {
                 }
                 // Подгоняем current под границы [min, max]
                 if (current < min) {
-                    warnings.push("elements[" + index + "] (seekbar) 'current' (" + current + ") is lower than 'min' (" + min + "). Set to min.");
+                    warnings.push(path + " (seekbar) 'current' (" + current + ") is lower than 'min' (" + min + "). Set to min.");
                     element.seekBarDialog.current = min;
                 } else if (current > max) {
-                    warnings.push("elements[" + index + "] (seekbar) 'current' (" + current + ") is higher than 'max' (" + max + "). Set to max.");
+                    warnings.push(path + " (seekbar) 'current' (" + current + ") is higher than 'max' (" + max + "). Set to max.");
                     element.seekBarDialog.current = max;
                 }
             }
@@ -577,10 +808,10 @@ let SimpleMenu = {
             // Предотвращение выхода за пределы массива
             if (element.type === "selection") {
                 if (element.selectedIndex < 0) {
-                    warnings.push("elements[" + index + "] (selection) 'selectedIndex' (" + element.selectedIndex + ") is lower than 0. Set to 0.");
+                    warnings.push(path + " (selection) 'selectedIndex' (" + element.selectedIndex + ") is lower than 0. Set to 0.");
                     element.selectedIndex = 0;
                 } else if (element.selectedIndex >= element.options.length) {
-                    warnings.push("elements[" + index + "] (selection) 'selectedIndex' (" + element.selectedIndex + ") is higher than or equal to 'options.length' (" + element.options.length + "). Set to " + (element.options.length - 1) + ".");
+                    warnings.push(path + " (selection) 'selectedIndex' (" + element.selectedIndex + ") is higher than or equal to 'options.length' (" + element.options.length + "). Set to " + (element.options.length - 1) + ".");
                     element.selectedIndex = element.options.length - 1;
                 }
             }
@@ -588,10 +819,10 @@ let SimpleMenu = {
             if (element.type === "multiselection") {
                 for (var i = 0; i < element.selectedIndexes.length; i++) {
                     if (element.selectedIndexes[i] < 0) {
-                        warnings.push("elements[" + index + "] (multiselection) 'selectedIndexes[" + i + "]' (" + element.selectedIndexes[i] + ") is lower than 0. Set to 0.");
+                        warnings.push(path + " (multiselection) 'selectedIndexes[" + i + "]' (" + element.selectedIndexes[i] + ") is lower than 0. Set to 0.");
                         element.selectedIndexes[i] = 0;
                     } else if (element.selectedIndexes[i] >= element.options.length) {
-                        warnings.push("elements[" + index + "] (multiselection) 'selectedIndexes[" + i + "]' (" + element.selectedIndexes[i] + ") is higher than or equal to 'options.length' (" + element.options.length + "). Set to " + (element.options.length - 1) + ".");
+                        warnings.push(path + " (multiselection) 'selectedIndexes[" + i + "]' (" + element.selectedIndexes[i] + ") is higher than or equal to 'options.length' (" + element.options.length + "). Set to " + (element.options.length - 1) + ".");
                         element.selectedIndexes[i] = element.options.length - 1;
                     }
                 }
@@ -607,7 +838,7 @@ let SimpleMenu = {
                     }
                 }
                 if (unique.length !== element.selectedIndexes.length) {
-                    warnings.push("elements[" + index + "] (multiselection) 'selectedIndexes' contained duplicate values. Deduplicated from " + element.selectedIndexes.length + " to " + unique.length + " item(s).");
+                    warnings.push(path + " (multiselection) 'selectedIndexes' contained duplicate values. Deduplicated from " + element.selectedIndexes.length + " to " + unique.length + " item(s).");
                     element.selectedIndexes = unique;
                 }
             }
@@ -652,6 +883,12 @@ let SimpleMenu = {
                     var refRules = resolveRef(globalSchema, rules.$ref);
                     if (refRules) rules = refRules;
                 }
+
+                if (rules && rules.$external) {
+                    result[key] = userSection[key];
+                    continue;
+                }
+    
                 
                 var userValue = userSection[key];
 
@@ -693,30 +930,73 @@ let SimpleMenu = {
             return result;
         }
 
-        function validateElements(userElements, globalSchema, parsedConfig) {
-            if (!userElements || !Array.isArray(userElements)) return [];
+        function validateElements(userElements, globalSchema, parsedConfig, options) {
+            options = options || {};
+            var allowSections = options.allowSections !== false;  // по умолчанию разрешены
+            var pathPrefix   = options.pathPrefix || "elements";
+
+            if (!Array.isArray(userElements)) return [];
+
             var validatedList = [];
             var elementsSchema = globalSchema.elements.properties;
-            
+
             for (var i = 0; i < userElements.length; i++) {
                 var item = userElements[i];
-                var itemType = item.type;
+                var itemPath = pathPrefix + "[" + i + "]";
+                var itemType = item && item.type;
+
                 if (!itemType || !elementsSchema[itemType]) {
-                    errors.push("Element at index " + i + " has missing or unknown type '" + itemType + "'");
+                    warnings.push("Element at " + itemPath + " has missing or unknown type '" + itemType + "'");
                     continue;
                 }
-                
+
+                // --- Особая ветка: section ---
+                if (itemType === "section") {
+                    if (!allowSections) {
+                        errors.push("Element at " + itemPath + " is 'section', but nested sections are not allowed");
+                        continue;
+                    }
+                    var validSection = validateSection(
+                        itemPath + " (section)",
+                        item,
+                        elementsSchema.section,
+                        parsedConfig,
+                        globalSchema
+                    );
+
+                    // Рекурсивно валидируем содержимое — уже без права на section
+                    if (item.elements === undefined || item.elements === null) {
+                        warnings.push("Section at " + itemPath + " has no 'elements' and will render as empty");
+                        validSection.elements = [];
+                    } else if (!Array.isArray(item.elements)) {
+                        errors.push("Section at " + itemPath + ": 'elements' must be an array");
+                        validSection.elements = [];
+                    } else if (item.elements.length === 0) {
+                        warnings.push("Section at " + itemPath + " has empty 'elements'");
+                        validSection.elements = validateElements(item.elements, globalSchema, parsedConfig, {
+                            allowSections: false,
+                            pathPrefix: itemPath + ".elements"
+                        });
+                    } else {
+                        validSection.elements = validateElements(item.elements, globalSchema, parsedConfig, {
+                            allowSections: false,
+                            pathPrefix: itemPath + ".elements"
+                        });
+                    }
+
+                    validatedList.push(validSection);
+                    continue;
+                }
+
+                // --- Обычный элемент ---
                 var validItem = validateSection(
-                    "elements[" + i + "] (" + itemType + ")", 
-                    item, 
-                    elementsSchema[itemType], 
-                    parsedConfig, 
+                    itemPath + " (" + itemType + ")",
+                    item,
+                    elementsSchema[itemType],
+                    parsedConfig,
                     globalSchema
                 );
-
-                // Корректируем логику границ
-                validItem = sanitizeElementLogic(validItem, i);
-
+                validItem = sanitizeElementLogic(validItem, itemPath);
                 validatedList.push(validItem);
             }
             return validatedList;
@@ -726,21 +1006,30 @@ let SimpleMenu = {
         // Сначала валидируем drawing, чтобы заполнить стандартные значения
         config.drawing = validateSection("drawing", userConfig.drawing, SCHEMA.drawing, config, SCHEMA);
         config.menu = validateSection("menu", userConfig.menu, SCHEMA.menu, config, SCHEMA);
-        config.elements = validateElements(userConfig.elements, SCHEMA, config);
-
+        config.elements = validateElements(userConfig.elements, SCHEMA, config, {allowSections: true, pathPrefix: "elements"});
         // Проверка наличия положительной кнопки при транзакционной модели поведения меню
         if (!config.menu.isReactivePattern && !(typeof config.menu.positiveButton === "object" && config.menu.positiveButton !== null)) {
             errors.push("Positive menu button is not set in main menu object. This element is required for the transactional menu behavior model (the 'isReactivePattern' parameter is set to false).");
         }
-
         reportValidation(errors, warnings);
+
+        let ctx = new android.view.ContextThemeWrapper(UI.getContext(), STYLES[config.drawing.menuStyle]);
+        var THEME_COLORS = {
+            title:           ColorHelper.convertColor(AttributesReader.getDialogTitleColor(ctx, null), "android"),
+            primaryText:     ColorHelper.convertColor(AttributesReader.getPrimaryTextColor(ctx, null), "android"),
+            secondaryText:   ColorHelper.convertColor(AttributesReader.getSecondaryTextColor(ctx, null), "android"),
+            accent:          ColorHelper.convertColor(AttributesReader.getAccentColor(ctx, null), "android"),
+            primary:         ColorHelper.convertColor(AttributesReader.getPrimaryColor(ctx, null), "android"),
+            primaryDark:     ColorHelper.convertColor(AttributesReader.getPrimaryDarkColor(ctx, null), "android"),
+            Background:      ColorHelper.convertColor(AttributesReader.getWindowBackgroundColor(ctx, null), "android")
+        };
 
         // CREATE
         let AlertDialog = android.app.AlertDialog;
         let CheckBox = android.widget.CheckBox;
         let DialogInterface = android.content.DialogInterface;
         let EditText = android.widget.EditText;
-        let GradientDrawable = android.graphics.drawable.GradientDrawable;
+        // let GradientDrawable = android.graphics.drawable.GradientDrawable;
         let Gravity = android.view.Gravity;
         let Html = android.text.Html;
         let LayoutParams = android.view.ViewGroup.LayoutParams;
@@ -764,56 +1053,44 @@ let SimpleMenu = {
             if (view.getParent() != null) view.getParent().removeView(view);
         };
 
-        function getStyledOptions(ctx, options, textSize, textColor) {
-            if (!options) return [];
-            let result = [];
-            // Переводим SP в пиксели для AbsoluteSizeSpan
-            let pxSize = null;
-            pxSize = Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, textSize, ctx.getResources().getDisplayMetrics()));
-            for (let i = 0; i < options.length; i++) {
-                let text = String(options[i]);
-                let spannable = new android.text.SpannableString(text);
-                // Цвет текста
-                if (textColor !== null) {
-                    spannable.setSpan(new android.text.style.ForegroundColorSpan(textColor), 0, text.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        function setTextColor(text_view, color_config, theme_color) {
+            if (color_config === null){
+                if (theme_color !== null){
+                    text_view.setTextColor(theme_color);
                 }
-                // Размер текста
-                if (pxSize !== null) {
-                    spannable.setSpan(new android.text.style.AbsoluteSizeSpan(pxSize), 0, text.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                }
-                result.push(spannable);
+            } else {
+                text_view.setTextColor(ColorHelper.convertColor(color_config, "android"));
             }
-            return result;
-        }
+        };
 
         // СЕПАРАТОР
-        function setSeparator(ctx, element_config, content_container) {
-            let padding = SimpleMenu.dpToPx(config.menu.titleParam.paddingHorizontal/2, ctx);
-            let textview = new TextView(ctx);
-            if (element_config.lineColor.length === 1) {
-                textview.setBackground(new android.graphics.drawable.ColorDrawable(element_config.lineColor[0]));
-            } else {
-                textview.setBackground(new GradientDrawable(ORIENTATIONS[element_config.lineGradientDirection], element_config.lineColor));
-            }
-            if (element_config.name !== null) {
-                textview.setText(element_config.name);
-                textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element_config.nameSize);
-                if (element_config.nameColor !== null) textview.setTextColor(element_config.nameColor);
-                textview.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-                let lp = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-                lp.setMargins(padding, 0, padding, 0);
-                textview.setPadding(padding, 0, padding, 0);
-                textview.setLayoutParams(lp);
-            } else {
-                let lp = new LinearLayout.LayoutParams(
-                    LayoutParams.MATCH_PARENT, 
-                    SimpleMenu.dpToPx(element_config.lineHeight, ctx), 1)
-                lp.setMargins(padding, 0, padding, 0);
-                textview.setPadding(padding, 0, padding, 0);
-                textview.setLayoutParams(lp);
-            };
-            content_container.addView(textview);
-        };
+        // function setSeparator(ctx, element_config, content_container) {
+        //     let padding = SimpleMenu.dpToPx(config.drawing.paddingHorizontal, ctx);
+        //     let textview = new TextView(ctx);
+        //     if (element_config.lineColor.length === 1) {
+        //         textview.setBackground(new android.graphics.drawable.ColorDrawable(element_config.lineColor[0]));
+        //     } else {
+        //         textview.setBackground(new GradientDrawable(ORIENTATIONS[element_config.lineGradientDirection], element_config.lineColor));
+        //     }
+        //     if (element_config.name !== null) {
+        //         textview.setText(element_config.name);
+        //         textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element_config.nameSize);
+        //         setTextColor(textview, element_config.nameColor, THEME_COLORS.primaryText);
+        //         textview.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        //         let lp = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        //         // lp.setMargins(padding, 0, padding, 0);
+        //         textview.setPadding(padding, 0, padding, 0);
+        //         textview.setLayoutParams(lp);
+        //     } else {
+        //         let lp = new LinearLayout.LayoutParams(
+        //             LayoutParams.MATCH_PARENT, 
+        //             SimpleMenu.dpToPx(element_config.lineHeight, ctx), 1)
+        //         // lp.setMargins(padding, 0, padding, 0);
+        //         textview.setPadding(padding, 0, padding, 0);
+        //         textview.setLayoutParams(lp);
+        //     };
+        //     content_container.addView(textview);
+        // };
 
         // ИМЯ ЭЛЕМЕНТА
         function setName(ctx, element_config, name_container, element_container) {
@@ -821,19 +1098,19 @@ let SimpleMenu = {
             textview.setText(element_config.name); // Установление текста
             textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element_config.nameSize); // Установление размера текста
             if (element_config.nameColor !== null) textview.setTextColor(element_config.nameColor);
-            textview.setLayoutParams(new LinearLayout.LayoutParams(
+            let lp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT,
                 LayoutParams.WRAP_CONTENT
-            )); // Установка параметра
+            );
+            lp.setMargins(0, SimpleMenu.dpToPx(10, ctx), 0, SimpleMenu.dpToPx(10, ctx));
+            textview.setLayoutParams(lp);
             textview.setEllipsize(TextUtils.TruncateAt.END); // Установка отображения
             textview.setMaxLines(2); // Установка количества строк 
             textview.setGravity(Gravity.START | Gravity.CENTER_VERTICAL); // Установка расположения внутри родителя
             if (typeof element_config.hint === "object" && element_config.hint !== null) { //Добавление подсказки элементу
                 if(element_config.hint.symbolColor !== null){
-                    /** @type {any} */
                     (textview).setText(Html.fromHtml(textview.getText().replace("\n", "<br>") + " <font color='" + ColorHelper.convertColor(element_config.hint.symbolColor, "hex") + "'>" + element_config.hint.symbol + "</font>")); //не хватает element_config.hint.symbolSize
                 } else {
-                    /** @type {any} */
                     (textview).setText(Html.fromHtml(textview.getText().replace("\n", "<br>") + element_config.hint.symbol)); //не хватает element_config.hint.symbolSize
                 }
                 textview.setOnClickListener(new OnClickListener({
@@ -849,9 +1126,11 @@ let SimpleMenu = {
                     }
                 }));
             }
+
+            name_container.setPadding(SimpleMenu.dpToPx(config.drawing.paddingHorizontal, ctx), 0, 0, 0);
             name_container.addView(textview);
             element_container.addView(name_container);
-        }
+        };
 
         // ДИАЛОГ
         function createAndShowDialog(ctx, dialog_config, builder, isMainMenu, index, positiveFunction) {
@@ -865,11 +1144,9 @@ let SimpleMenu = {
                     }
                 }));
             }
-            // alert(JSON.stringify(dialog_config.negativeButton, null, 2));
             if (typeof dialog_config.negativeButton === "object" && dialog_config.negativeButton !== null){
                 builder.setNegativeButton(dialog_config.negativeButton.text, new DialogInterface.OnClickListener({
                     onClick: function() {
-                        // alert('TRUE');
                         if (typeof dialog_config.negativeButton.onClick === "function"){
                             dialog_config.negativeButton.onClick(builder, index);
                         }
@@ -887,7 +1164,7 @@ let SimpleMenu = {
             }
 
             if(isMainMenu){
-                let padding = SimpleMenu.dpToPx(dialog_config.titleParam.paddingHorizontal, ctx);
+                let padding = SimpleMenu.dpToPx(dialog_config.titleParam.paddingHorizontal*2, ctx);
                 let paddingTop = SimpleMenu.dpToPx(dialog_config.titleParam.paddingTop, ctx);
                 let paddingBottom = SimpleMenu.dpToPx(dialog_config.titleParam.paddingBottom, ctx);
                 let customTitle = new android.widget.TextView(ctx);
@@ -895,51 +1172,7 @@ let SimpleMenu = {
                 customTitle.setPadding(padding, paddingTop, padding, paddingBottom);
                 customTitle.setGravity(ALIGNMENTS[dialog_config.titleParam.alignment]);
                 customTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, dialog_config.titleParam.size);
-                if (dialog_config.titleParam.color !== null){
-                    customTitle.setTextColor(dialog_config.titleParam.color)
-                } else {
-                    let titleColor = -1;
-                    // 1. Пытаемся получить стиль заголовка из темы
-                    let styleTa = ctx.getTheme().obtainStyledAttributes([android.R.attr.windowTitleStyle]);
-                    let styleId = 0;
-                    try {
-                        styleId = styleTa.getResourceId(0, 0);
-                    } finally {
-                        styleTa.recycle();
-                    }
-                    // 2. Если стиль есть — читаем textColor из него
-                    if (styleId !== 0) {
-                        let colorTa = ctx.obtainStyledAttributes(styleId, [android.R.attr.textColor]);
-                        try {
-                            titleColor = colorTa.getColor(0, -1);
-                        } finally {
-                            colorTa.recycle();
-                        }
-                    }
-                    // 3. Фолбэк: textColorPrimary из темы
-                    if (titleColor === -1) {
-                        let primaryTa = ctx.getTheme().obtainStyledAttributes([android.R.attr.textColorPrimary]);
-                        try {
-                            titleColor = primaryTa.getColor(0, -1);
-                        } finally {
-                            primaryTa.recycle();
-                        }
-                    }
-                    // 4. Последний фолбэк: textColor из темы
-                    if (titleColor === -1) {
-                        let fallbackTa = ctx.getTheme().obtainStyledAttributes([android.R.attr.textColor]);
-                        try {
-                            titleColor = fallbackTa.getColor(0, -1);
-                        } finally {
-                            fallbackTa.recycle();
-                        }
-                    }
-                    // 5. Применяем, если что-то нашли
-                    if (titleColor !== -1) {
-                        customTitle.setTextColor(titleColor);
-                    }
-                }
-                
+                setTextColor(customTitle, dialog_config.titleParam.color, THEME_COLORS.title);
                 builder.setCustomTitle(customTitle);
             }
 
@@ -975,16 +1208,63 @@ let SimpleMenu = {
             params.gravity = ALIGNMENTS[dialog_config.dialogAlignment];
             params.x = SimpleMenu.dpToPx(0, ctx);
             params.y = SimpleMenu.dpToPx(0, ctx);
-            window.setAttributes(params);
 
-
-            dialog.show()
-            // Установка анимации и запуск диалога
-            var decorView = window.getDecorView();
-            if (decorView instanceof android.view.ViewGroup && decorView.getChildCount() > 0) {
-                decorView.getChildAt(0).startAnimation(android.view.animation.AnimationUtils.loadAnimation(ctx, config.drawing.animation));
+            // Правильный отступ при меньшей ширины дочернего диалога
+            let padding = SimpleMenu.dpToPx(config.drawing.paddingHorizontal, ctx);
+            if (!isMainMenu && ValuesCache.mainDialogWight > 0) {
+                if (dialog_config.dialogAlignment === "LEFT") {
+                    params.x = padding;
+                } else if (dialog_config.dialogAlignment === "RIGHT") {
+                    params.x = -padding;
+                } else {
+                    params.x = 0;
+                }
             }
-        }
+            
+            // Закругление углов
+            if (THEME_COLORS.Background !== null) {
+                let original = window.getDecorView().getBackground();
+                let radius = isMainMenu ?
+                    SimpleMenu.dpToPx(config.drawing.cornerRadius, ctx) :
+                    SimpleMenu.dpToPx(config.drawing.cornerRadius -
+                    config.drawing.paddingHorizontal, ctx);
+                let shape = null;
+                if (original instanceof android.graphics.drawable.InsetDrawable) {
+                    let inner = original.getDrawable();
+                    if (inner instanceof android.graphics.drawable.GradientDrawable) {
+                        shape = inner;
+                    }
+                }
+                if (shape !== null) {
+                    shape.setColor(THEME_COLORS.Background);
+                    shape.setCornerRadius(radius);
+                } else {
+                    shape = new android.graphics.drawable.GradientDrawable();
+                    shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                    shape.setColor(THEME_COLORS.Background);
+                    shape.setCornerRadius(radius);
+                    window.setBackground(shape);
+                }
+            }
+            
+            window.setAttributes(params);
+            dialog.show();
+
+            // Ширина дочерних диалогов
+            if (!isMainMenu && ValuesCache.mainDialogWight > 0) {
+                let childWidth = ValuesCache.mainDialogWight - padding*2;
+                window.setLayout(childWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+
+            if (isMainMenu && ValuesCache.mainDialogWight === 0) {
+                let decor = window.getDecorView();
+                decor.post(new java.lang.Runnable({
+                    run: function() {
+                        ValuesCache.mainDialogWight = decor.getWidth();
+                    }
+                }));
+            }
+        };
 
         // КНОПКА
         function createButton(ctx, element_config, widget_container, element_container, content_container, index, onClickFunction) {
@@ -992,7 +1272,7 @@ let SimpleMenu = {
             // Текст кнопки
             let button_text = new TextView(ctx);
             button_text.setText(element_config.buttonText);
-            if (element_config.buttonTextColor !== null) button_text.setTextColor(element_config.buttonTextColor);
+            setTextColor(button_text, element_config.buttonTextColor, THEME_COLORS.primaryText);
             button_text.setTextSize(TypedValue.COMPLEX_UNIT_SP, element_config.buttonTextSize);
             button_text.setMaxLines(2);
             button_text.setEllipsize(TextUtils.TruncateAt.END);
@@ -1002,12 +1282,13 @@ let SimpleMenu = {
             let chevron = new TextView(ctx);
             chevron.setText(">");
             chevron.setTextSize(TypedValue.COMPLEX_UNIT_SP, element_config.buttonTextSize);
-            if (element_config.buttonTextColor !== null) chevron.setTextColor(element_config.buttonTextColor);
+            setTextColor(chevron, element_config.buttonTextColor, THEME_COLORS.primaryText);
             chevron.setGravity(Gravity.CENTER);
             chevron.setLayoutParams(new LinearLayout.LayoutParams(chevronWidth, LayoutParams.WRAP_CONTENT));
             widget_container.addView(button_text);
             widget_container.addView(chevron);
             widget_container.setClickable(true);
+            widget_container.setPadding(0, 0, SimpleMenu.dpToPx(config.drawing.paddingHorizontal, ctx), 0);
             widget_container.setOnClickListener(new OnClickListener({
                 onClick: function(button) {
                     onClickFunction && onClickFunction(element_config, button, index);
@@ -1016,7 +1297,7 @@ let SimpleMenu = {
             }));
             element_container.addView(widget_container);
             content_container.addView(element_container);
-        }
+        };
 
         // ЧЕКБОКС                               
         function createCheckBox(ctx, element_config, widget_container, element_container, content_container, index) {
@@ -1026,23 +1307,19 @@ let SimpleMenu = {
                 LinearLayout.LayoutParams.WRAP_CONTENT, 
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ));
-
-                checkbox.setOnCheckedChangeListener(new OnCheckedChangeListener({
-                    onCheckedChanged: function(checkbox, isChecked) {
-                        if(config.menu.isReactivePattern) {
-                            element_config.state = isChecked;
-                        } else {
-                            draft_config.elements[index].state = isChecked; 
-                        }
-                        if (element_config.onCheck != null) {
-                            element_config.onCheck(checkbox, isChecked, index);
-                        }
+            checkbox.setOnCheckedChangeListener(new OnCheckedChangeListener({
+                onCheckedChanged: function(checkbox, isChecked) {
+                    element_config.state = isChecked;
+                    if (element_config.onCheck != null) {
+                        element_config.onCheck(checkbox, isChecked, index);
                     }
-                }));
+                }
+            }));
+            widget_container.setPadding(0, 0, SimpleMenu.dpToPx(config.drawing.paddingHorizontal, ctx), 0);
             widget_container.addView(checkbox);
             element_container.addView(widget_container);
             content_container.addView(element_container);
-        }
+        };
 
         // ПЕРЕКЛЮЧАТЕЛЬ
         function createSwitch(ctx, element_config, widget_container, element_container, content_container, index) {
@@ -1052,26 +1329,212 @@ let SimpleMenu = {
                 LinearLayout.LayoutParams.WRAP_CONTENT, 
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ));
-
-                switcher.setOnCheckedChangeListener(new OnCheckedChangeListener({
-                    onCheckedChanged: function(switcher, isChecked) {
-                        if(config.menu.isReactivePattern) {
-                            element_config.state = isChecked;
-                        } else {
-                            draft_config.elements[index].state = isChecked;
-                        }
-                        if (element_config.onSwitch !== null) {
-                            element_config.onSwitch(switcher, isChecked, index);
-                        }
+            switcher.setOnCheckedChangeListener(new OnCheckedChangeListener({
+                onCheckedChanged: function(switcher, isChecked) {
+                    element_config.state = isChecked;
+                    if (element_config.onSwitch !== null) {
+                    element_config.onSwitch(switcher, isChecked, index);
                     }
-                }));
+                }
+            }));
+            widget_container.setPadding(0, 0, SimpleMenu.dpToPx(config.drawing.paddingHorizontal, ctx), 0);
             widget_container.addView(switcher);
             element_container.addView(widget_container);
             content_container.addView(element_container);
-        }
+        };
+
+        // получение параметров 
+        function getStyledOptions(ctx, options, textSize, textColor) {
+            if (!options) return [];
+            let result = [];
+            // Переводим SP в пиксели для AbsoluteSizeSpan
+            let pxSize = null;
+            pxSize = Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, textSize, ctx.getResources().getDisplayMetrics()));
+            for (let i = 0; i < options.length; i++) {
+                let text = String(options[i]);
+                let spannable = new android.text.SpannableString(text);
+                // Цвет текста
+                if (textColor !== null) {
+                    spannable.setSpan(new android.text.style.ForegroundColorSpan(textColor), 0, text.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                }
+                // Размер текста
+                if (pxSize !== null) {
+                    spannable.setSpan(new android.text.style.AbsoluteSizeSpan(pxSize), 0, text.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                }
+                result.push(spannable);
+            }
+            return result;
+        };
+
+        // Параметры drawable
+        function setDrawable(ctx, shape, type, change, padding, radiusPx, sideElement, sideList){
+            if (THEME_COLORS.Background === null) return;
+
+            if (radiusPx !== null){
+                let r = SimpleMenu.dpToPx(radiusPx, ctx);
+                switch (type){
+                    case "single_element":
+                        switch (sideList){
+                        case true: // лист над элементом
+                            shape.setCornerRadii([r, r, 0, 0, r, r, r, r]);
+                        break;
+                        case false: // лист под элементом
+                            shape.setCornerRadii([r, r, r, r, 0, 0, r, r]);
+                        break;
+                        default: // лист не показан (не менаем элемент)
+                            shape.setCornerRadii([r, r, r, r, r, r, r, r]);
+                        }
+                    break;
+                    case "section_element":
+                        switch (sideElement){
+                            case true: // элемент вверху секции
+                                switch (sideList){
+                                    case true: // лист над элементом
+                                        shape.setCornerRadii([r, r, 0, 0, 0, 0, 0, 0]);
+                                    break;
+                                    case false: // лист под элементом
+                                        shape.setCornerRadii([r, r, r, r, 0, 0, 0, 0]);
+                                    break;
+                                    default: // лист не показан (не менаем элемент)
+                                        shape.setCornerRadii([r, r, r, r, 0, 0, 0, 0]);
+                                }
+                            break;
+                            case false: // элемент внизу секции
+                                switch (sideList){
+                                    case true: // лист над элементом
+                                        shape.setCornerRadii([0, 0, 0, 0, r, r, r, r]);
+                                    break;
+                                    case false: // лист под элементом
+                                        shape.setCornerRadii([0, 0, 0, 0, 0, 0, r, r]);
+                                    break;
+                                    default: // лист не показан (не менаем элемент)
+                                        shape.setCornerRadii([0, 0, 0, 0, r, r, r, r]);
+                                }
+                            break;
+                            default: // элемент в секции по центру
+                                shape.setCornerRadii([0, 0, 0, 0, 0, 0, 0, 0]);
+                        }
+                    break;
+                    case "list":
+                        switch (sideList){
+                            case true: // лист над элементом
+                                shape.setCornerRadii([r, r, r, r, 0, 0, 0, 0]);
+                            break;
+                            case false: // лист под элементом
+                                shape.setCornerRadii([0, 0, 0, 0, r, r, r, r]);
+                            break;
+                            default:
+                                shape.setCornerRadii([r, r, r, r, r, r, r, r]);
+                        }
+                    break;
+                    case "section":
+                        shape.setCornerRadii([r, r, r, r, r, r, r, r]);
+                    break;
+                }
+            };
+
+            if (change !== null){
+                let adjusted = ColorHelper.isDark(THEME_COLORS.Background)
+                    ? ColorHelper.lighten(THEME_COLORS.Background, change)
+                    : ColorHelper.darken(THEME_COLORS.Background, change);
+                shape.setColor(adjusted);
+            } else {
+                shape.setColor(THEME_COLORS.Background);
+            };
+
+            let drawable;
+            padding = padding !== null ? SimpleMenu.dpToPx(padding, ctx) : 0;
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                shape.setPadding(padding, 0, padding, 0);
+                drawable = shape;
+            } else {
+                drawable = new android.graphics.drawable.InsetDrawable(shape, padding, 0, padding, 0);
+            }
+
+            return drawable;
+        };
+
+        // Определение верха или низа
+        function isPopupAboveAnchor(listPopup) {
+            try {
+                let clazz = listPopup.getClass();
+                let field = clazz.getDeclaredField("mPopup");
+                field.setAccessible(true);
+                let popupWindow = field.get(listPopup);
+                if (popupWindow != null) {
+                    return popupWindow.isAboveAnchor();
+                }
+            } catch (err) {
+                Logger.Log("\n[SimpleMenuAPI]: Reflection error getting render side ListPopupWindow\n" + err, "ERROR");
+            }
+            return false;
+        };
+
+        // Убираем тень у списка
+        function disablePopupElevation(listPopup) {
+            try {
+                let field = listPopup.getClass().getDeclaredField("mPopup");
+                field.setAccessible(true);
+                let popupWindow = field.get(listPopup);
+                if (popupWindow === null) return;
+                popupWindow.setElevation(0.5);
+
+                let content = popupWindow.getContentView();
+                if (content !== null && android.os.Build.VERSION.SDK_INT >= 21) {
+                    content.setElevation(0);
+                }
+            } catch (err) {
+                Logger.Log("\n[SimpleMenuAPI]: Reflection error disabling popup elevation\n" + err, "ERROR");
+            }
+        };
+
+        // Применение параметров к элементу списка
+        function applyListPopupItemStyle(ctx, listPopup) {
+            let listView = listPopup.getListView();
+            if (listView === null) return;
+
+            let pad = SimpleMenu.dpToPx(config.drawing.paddingHorizontal, ctx);
+
+            let adjust = function(view) {
+                if (!(view instanceof android.widget.CheckedTextView)) return;
+                view.setPadding(0, view.getPaddingTop(), 0, view.getPaddingBottom());
+                view.setCompoundDrawablePadding(pad);
+                view.setSingleLine(false);
+                view.setMaxLines(2);
+                view.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            };
+
+            for (let i = 0; i < listView.getChildCount(); i++) adjust(listView.getChildAt(i));
+
+            listView.setOnHierarchyChangeListener(new android.view.ViewGroup.OnHierarchyChangeListener({
+                onChildViewAdded: function(parent, child) { adjust(child); },
+                onChildViewRemoved: function(parent, child) {}
+            }));
+        };
+
+        // Анимация закрытия
+        function setPopupExitSlide(listPopup, isAbove) {
+            if (android.os.Build.VERSION.SDK_INT < 23) return;
+            try {
+                let field = listPopup.getClass().getDeclaredField("mPopup");
+                field.setAccessible(true);
+                let popupWindow = field.get(listPopup);
+                if (popupWindow === null) return;
+
+                let gravity = isAbove
+                    ? android.view.Gravity.BOTTOM
+                    : android.view.Gravity.TOP;
+
+                let slide = new android.transition.Slide(gravity);
+                slide.setDuration(POPUP_ANIM_MS);
+                popupWindow.setExitTransition(slide);
+            } catch (err) {
+                Logger.Log("\n[SimpleMenuAPI]: Reflection error setting popup exit transition\n" + err, "ERROR");
+            }
+        };
 
         // СЕЛЕКТОР
-        function createSelection(ctx, element_config, widget_container, element_container, content_container, index) {
+        function createSelection(ctx, element_config, widget_container, element_container, content_container, element_shape, element_type, element_side, index) {
             if (element_config.buttonText === null) {
                 element_config.buttonText = element_config.options[element_config.selectedIndex];
             }
@@ -1079,34 +1542,39 @@ let SimpleMenu = {
             let openSpinner = function(element_config, button, elementIndex) {
                 let listPopup = new android.widget.ListPopupWindow(ctx);
 
-                // Формируем стилизованные элементы списка без JavaAdapter
                 let styledOptions = getStyledOptions(
                     ctx, element_config.options,
                     element_config.buttonTextSize,
                     element_config.buttonTextColor
                 );
 
-                let adapter = new android.widget.ArrayAdapter(ctx, android.R.layout.simple_list_item_1, styledOptions);
-
+                let adapter = new android.widget.ArrayAdapter(
+                    ctx, android.R.layout.simple_list_item_single_choice, styledOptions
+                );
                 listPopup.setAdapter(adapter);
                 listPopup.setAnchorView(button);
                 listPopup.setModal(true);
-                listPopup.setSelection(config.menu.isReactivePattern
-                    ? element_config.selectedIndex 
-                    : draft_config.elements[index].selectedIndex)
+                listPopup.setSelection(element_config.selectedIndex);
+
+                let list_shape = new android.graphics.drawable.GradientDrawable();
+                list_shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE)
+                // ЛИСТ: цвет и отступы
+                listPopup.setBackgroundDrawable(
+                    setDrawable(ctx, list_shape, "list", 10,
+                        config.drawing.paddingHorizontal, null,  null, null));
+                listPopup.setWidth(button.getWidth());
+
+                // Убираем тень у списка
+                disablePopupElevation(listPopup);
 
                 // Ограничение высоты + нативный скролл
-                let maxHeight = Math.floor(ctx.getResources().getDisplayMetrics().heightPixels * 0.40);
+                let maxHeight = Math.floor(ctx.getResources().getDisplayMetrics().heightPixels * 0.45);
                 let estimatedHeight = (element_config.options ? element_config.options.length : 0) * SimpleMenu.dpToPx(48, ctx);
                 if (estimatedHeight > maxHeight) listPopup.setHeight(maxHeight);
 
                 listPopup.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener({
                     onItemClick: function(list, item, position, itemId) {
-                            if (config.menu.isReactivePattern) {
-                                element_config.selectedIndex = position;
-                            } else {
-                                draft_config.elements[index].selectedIndex = position;
-                            }
+                        element_config.selectedIndex = position;
                         if (element_config.onSelect !== null) {
                             element_config.onSelect(list, item, position, itemId, elementIndex);
                         }
@@ -1115,13 +1583,50 @@ let SimpleMenu = {
                 }));
 
                 listPopup.show();
-            };
 
+                // Определение верха или низа
+                let isAbove = isPopupAboveAnchor(listPopup);
+                // ЛИСТ: углы и направление
+                setDrawable(ctx, list_shape, "list", 10, config.drawing.paddingHorizontal,
+                    config.drawing.cornerRadius - config.drawing.paddingHorizontal, 
+                    element_side, isAbove);
+                // ЭЛЕМЕНТ: Установка параметрв
+                setDrawable(ctx, element_shape, element_type, 10, null,
+                    config.drawing.cornerRadius - config.drawing.paddingHorizontal,
+                    element_side, isAbove);
+
+                button.post(new Runnable({
+                    run: function() {
+                        let listView = listPopup.getListView();
+                        if (listView === null) return;
+                        listView.setChoiceMode(android.widget.ListView.CHOICE_MODE_SINGLE);
+                        listView.setItemChecked(element_config.selectedIndex, true);
+                        // применение параметров к элементу списка
+                        applyListPopupItemStyle(ctx, listPopup);
+                    }
+                }));
+
+                // Анимация закрытия
+                setPopupExitSlide(listPopup, isAbove);
+                // Закрытие списка
+                listPopup.setOnDismissListener(new android.widget.PopupWindow.OnDismissListener({
+                    onDismiss: function() {
+                        element_container.postDelayed(new Runnable({
+                            run: function() {
+                                // ЭЛЕМЕНТ: Сброс параметров
+                                setDrawable(ctx, element_shape, element_type, 5, null,
+                                    config.drawing.cornerRadius - config.drawing.paddingHorizontal, 
+                                    element_side, null);
+                            }
+                        }), POPUP_ANIM_MS);
+                    }
+                }));
+            };
             createButton(ctx, element_config, widget_container, element_container, content_container, index, openSpinner);
-        }
+        };
 
         // МУЛЬТИСЕЛЕКТОР
-        function createMultiSelection(ctx, element_config, widget_container, element_container, content_container, index) {
+        function createMultiSelection(ctx, element_config, widget_container, element_container, content_container, element_shape, element_type, element_side, index) {
             if (element_config.buttonText === null) {
                 element_config.buttonText = element_config.selectedIndexes
                     .map(function (i) { return element_config.options[i]; })
@@ -1130,9 +1635,7 @@ let SimpleMenu = {
 
             let openMultiSpinner = function(element_config, button, elementIndex) {
                 let listPopup = new android.widget.ListPopupWindow(ctx);
-                let target = config.menu.isReactivePattern
-                    ? element_config.selectedIndexes
-                    : draft_config.elements[index].selectedIndexes;
+                let target = element_config.selectedIndexes;
 
                 let styledOptions = getStyledOptions(
                     ctx, element_config.options,
@@ -1140,23 +1643,48 @@ let SimpleMenu = {
                     element_config.buttonTextColor
                 );
 
-                let adapter = new android.widget.ArrayAdapter(ctx, android.R.layout.simple_list_item_multiple_choice, styledOptions);
-
+                let adapter = new android.widget.ArrayAdapter(
+                    ctx,
+                    android.R.layout.simple_list_item_multiple_choice,
+                    styledOptions
+                );
                 listPopup.setAdapter(adapter);
                 listPopup.setAnchorView(button);
                 listPopup.setModal(true);
 
-                let maxHeight = Math.floor(ctx.getResources().getDisplayMetrics().heightPixels * 0.40);
+                let list_shape = new android.graphics.drawable.GradientDrawable();
+                list_shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                // ЛИСТ: цвет и отступы
+                listPopup.setBackgroundDrawable(
+                    setDrawable(ctx, list_shape, "list", 10,
+                        config.drawing.paddingHorizontal, null, null, null));
+                listPopup.setWidth(button.getWidth());
+
+                // Убираем тень у списка
+                disablePopupElevation(listPopup);
+
+                // Ограничение высоты + нативный скролл
+                let maxHeight = Math.floor(ctx.getResources().getDisplayMetrics().heightPixels * 0.45);
                 let estimatedHeight = (element_config.options ? element_config.options.length : 0) * SimpleMenu.dpToPx(48, ctx);
                 if (estimatedHeight > maxHeight) listPopup.setHeight(maxHeight);
 
-                // Сначала показываем попап
                 listPopup.show();
-                // Затем откладываем настройку ListView до следующего цикла UI-потока
+
+                // Определение верха или низа
+                let isAbove = isPopupAboveAnchor(listPopup);
+                // ЛИСТ: углы и направление
+                setDrawable(ctx, list_shape, "list", 10, config.drawing.paddingHorizontal,
+                    config.drawing.cornerRadius - config.drawing.paddingHorizontal,
+                    element_side, isAbove);
+                // ЭЛЕМЕНТ: Установка параметров
+                setDrawable(ctx, element_shape, element_type, 10, null,
+                    config.drawing.cornerRadius - config.drawing.paddingHorizontal,
+                    element_side, isAbove);
+
                 button.post(new Runnable({
                     run: function() {
                         let listView = listPopup.getListView();
-                        if (listView === null) throw new Error("[SimpleMenuAPI] elements[" + index + "] ('multiselection') ListPopupWindow.getListView() returned null after show()");
+                        if (listView === null) throw new Error("\n[SimpleMenuAPI] elements[" + index + "] ('multiselection') ListPopupWindow.getListView() returned null after show()");
                         listView.setChoiceMode(android.widget.ListView.CHOICE_MODE_MULTIPLE);
                         for (let i = 0; i < target.length; i++) listView.setItemChecked(target[i], true);
 
@@ -1178,21 +1706,33 @@ let SimpleMenu = {
                                 }
                             }
                         }));
+                        applyListPopupItemStyle(ctx, listPopup);
                     }
                 }));
 
-                // Колбэк закрытия
-                if (element_config.onDismissSpinner !== null) {
-                    listPopup.setOnDismissListener(new android.widget.PopupWindow.OnDismissListener({
-                        onDismiss: function() {
+                // Анимация закрытия
+                setPopupExitSlide(listPopup, isAbove);
+
+                // Закрытие списка
+                listPopup.setOnDismissListener(new android.widget.PopupWindow.OnDismissListener({
+                    onDismiss: function() {
+                        if (element_config.onDismissSpinner !== null) {
                             element_config.onDismissSpinner(elementIndex);
                         }
-                    }));
-                }
+                        element_container.postDelayed(new Runnable({
+                            run: function() {
+                                // ЭЛЕМЕНТ: Сброс параметров
+                                setDrawable(ctx, element_shape, element_type, 5, null,
+                                    config.drawing.cornerRadius - config.drawing.paddingHorizontal,
+                                    element_side, null);
+                            }
+                        }), POPUP_ANIM_MS);
+                    }
+                }));
             };
 
             createButton(ctx, element_config, widget_container, element_container, content_container, index, openMultiSpinner);
-        }
+        };
 
         // ПОЛЗУНОК
         function createSeekBar(ctx, element_config, widget_container, element_container, content_container, index){
@@ -1207,7 +1747,7 @@ let SimpleMenu = {
                 layout.setOrientation(LinearLayout.VERTICAL);
                 layout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.FILL_PARENT, LinearLayout.LayoutParams.FILL_PARENT));
                 textview.setText(element_config.seekBarDialog.prefixText
-                    + (config.menu.isReactivePattern ? element_config.seekBarDialog.current : draft_config.elements[index].seekBarDialog.current)
+                    + element_config.seekBarDialog.current
                     + element_config.seekBarDialog.suffixText);
                 element_config.seekBarDialog.textColor !== null && textview.setTextColor(element_config.seekBarDialog.textColor);
                 textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element_config.seekBarDialog.textSize);
@@ -1215,9 +1755,7 @@ let SimpleMenu = {
                 textview.setGravity(Gravity.LEFT);
                 //textview.setPadding(padding, SimpleMenu.dpToPx(7, ctx), padding, SimpleMenu.dpToPx(7, ctx));
                 textview.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-                seekbar.setProgress(config.menu.isReactivePattern
-                    ? element_config.seekBarDialog.current
-                    : draft_config.elements[index].seekBarDialog.current);
+                seekbar.setProgress(element_config.seekBarDialog.current);
                 seekbar.setMin(element_config.seekBarDialog.min);
                 seekbar.setMax(element_config.seekBarDialog.max);
 
@@ -1251,17 +1789,13 @@ let SimpleMenu = {
                 let dialog = new AlertDialog.Builder(ctx);
                 dialog.setView(layout);
                 function updateCurrent() {
-                    if (config.menu.isReactivePattern) {
-                        element_config.seekBarDialog.current = seekbar.getProgress();
-                    } else {
-                        draft_config.elements[index].seekBarDialog.current = seekbar.getProgress();
-                    }
+                    element_config.seekBarDialog.current = seekbar.getProgress();
                 }
                 createAndShowDialog(ctx, element_config.seekBarDialog, dialog, false, elementIndex, updateCurrent);
             }
 
             createButton(ctx, element_config, widget_container, element_container, content_container, index, openSeekBarDialog);
-        }
+        };
 
         // РЕДАКТИРУЕМЫЙ ТЕКСТ
         function createEditText(ctx, element_config, widget_container, element_container, content_container, index) {
@@ -1276,9 +1810,7 @@ let SimpleMenu = {
                 edittext.setHint(element_config.editTextDialog.placeholder);
                 // edittext.setHintTextColor(...)(element_config.editTextDialog.textColor); для config.editTextDialog.placeholderOpacity
                 // edittext.setHintSize(element_config.editTextDialog.textSize);
-                edittext.setText(config.menu.isReactivePattern
-                    ? element_config.editTextDialog.text
-                    : draft_config.elements[index].editTextDialog.text);
+                edittext.setText(element_config.editTextDialog.text);
                 edittext.setTextSize(TypedValue.COMPLEX_UNIT_SP, element_config.editTextDialog.textSize);
                 if (element_config.editTextDialog.textColor !== null) edittext.setTextColor(element_config.editTextDialog.textColor);
                 edittext.setMaxLines(element_config.editTextDialog.linesCount);
@@ -1307,11 +1839,7 @@ let SimpleMenu = {
                 let dialog = new AlertDialog.Builder(ctx);
                 dialog.setView(layout);
                 function updateCurrent() {
-                    if(config.menu.isReactivePattern) {
-                        element_config.editTextDialog.text = String(edittext.getText());
-                    } else {
-                        draft_config.elements[index].editTextDialog.text = String(edittext.getText());
-                    }
+                    element_config.editTextDialog.text = String(edittext.getText());
                 }
                 createAndShowDialog(ctx, element_config.editTextDialog, dialog, false, elementIndex, updateCurrent);
             }
@@ -1319,17 +1847,58 @@ let SimpleMenu = {
             createButton(ctx, element_config, widget_container, element_container, content_container, index, openEditTextDialog);
         };
 
+        // ПЕРЕБОР
+        function renderElement(ctx, element_config, name_container, widget_container, element_container, content_container, element_shape, element_type, element_side, index, key){
+            switch (key) {
+                // case "separator":
+                //     setSeparator(ctx, element_config, content_container);
+                //     break;
+                case "button":
+                    setName(ctx, element_config, name_container, element_container);
+                    createButton(ctx, element_config, widget_container, element_container, content_container, index);
+                    break;
+                case "checkbox":
+                    setName(ctx, element_config, name_container, element_container);
+                    createCheckBox(ctx, element_config, widget_container, element_container, content_container, index);
+                    break;
+                case "switch":
+                    setName(ctx, element_config, name_container, element_container);
+                    createSwitch(ctx, element_config, widget_container, element_container, content_container, index);
+                    break;
+                case "selection":
+                    setName(ctx, element_config, name_container, element_container);
+                    createSelection(ctx, element_config, widget_container, element_container, content_container, element_shape, element_type, element_side, index);
+                    break;
+                case "multiselection":
+                    setName(ctx, element_config, name_container, element_container);
+                    createMultiSelection(ctx, element_config, widget_container, element_container, content_container, element_shape, element_type, element_side, index);
+                    break;
+                case "seekbar":
+                    setName(ctx, element_config, name_container, element_container);
+                    createSeekBar(ctx, element_config, widget_container, element_container, content_container, index)
+                    break;
+                case "edittext":
+                    setName(ctx, element_config, name_container, element_container);
+                    createEditText(ctx, element_config, widget_container, element_container, content_container, index);
+                    break;
+                
+                default:
+                    Logger.Log("\n[SimpleMenuAPI] show(): Unknown element '" + element_config.type + "'. Expected one of: " + Object.keys(SCHEMA.elements.properties).join(", "), "WARNING");
+            };
+        }
+
         return {
             show: function() {
                 if (isShown) return;
                 isShown = true;
                 let activity = UI.getContext();
                 if (!config.menu.isReactivePattern) draft_config = SimpleMenu.deepClone(config);
+                let target_config = config.menu.isReactivePattern ? config : draft_config;
                 activity.runOnUiThread(
                     new Runnable({
                         run: function() {
                             try {
-                                let ctx = new android.view.ContextThemeWrapper(activity, config.drawing.menuStyle);
+                                let ctx = new android.view.ContextThemeWrapper(activity, STYLES[config.drawing.menuStyle]);
                                 // Корень меню
                                 let menu_container = new RelativeLayout(ctx);
                                 menu_container.setLayoutParams(new RelativeLayout.LayoutParams(
@@ -1351,73 +1920,141 @@ let SimpleMenu = {
                                     LayoutParams.WRAP_CONTENT
                                 ));
 
-                                let padding = SimpleMenu.dpToPx(config.menu.titleParam.paddingHorizontal, ctx);
+                                let padding = SimpleMenu.dpToPx(config.drawing.paddingHorizontal, ctx);
                                 content_container.setOrientation(LinearLayout.VERTICAL);
                                 content_container.setGravity(Gravity.CENTER);
+                                content_container.setPadding(padding, 0, padding, 0);
 
                                 scrollable_container.addView(content_container);
                                 menu_container.addView(scrollable_container);
-
+                                
+                                let element_index = 0;
                                 // Создание элементов
-                                for (let index = 0; index < config.elements.length; index++){
-                                    let element_config = config.elements[index];
+                                for (let index = 0; index < target_config.elements.length; index++){
+                                    let element_config = target_config.elements[index];
+                                    element_index++;
 
-                                    // Контейнер элемента
-                                    let element_container = new LinearLayout(ctx);
-                                    element_container.setLayoutParams(new LinearLayout.LayoutParams(
-                                        LayoutParams.MATCH_PARENT,
-                                        LayoutParams.WRAP_CONTENT
-                                    ));
-                                    element_container.setGravity(Gravity.CENTER_VERTICAL);
-                                    element_container.setOrientation(LinearLayout.HORIZONTAL);
-                                    element_container.setMinimumHeight(SimpleMenu.dpToPx(48, ctx));
-                                    if (element_config.type !== "separator") element_container.setPadding(padding, 0, padding, 0);
+                                    if(element_config.type !== "section") {
+                                        // Контейнер элемента
+                                        let element_container = new LinearLayout(ctx);
+                                        let element_params = new LinearLayout.LayoutParams(
+                                            LayoutParams.MATCH_PARENT,
+                                            LayoutParams.WRAP_CONTENT
+                                        );
+                                        element_params.setMargins(0, 0, 0, SimpleMenu.dpToPx(config.drawing.paddingHorizontal/2, ctx));
+                                        element_container.setLayoutParams(element_params);
 
-                                    // Контейнер имени элемента
-                                    let name_container = new LinearLayout(ctx);
-                                    name_container.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 2));
-                                    name_container.setGravity(Gravity.CENTER_VERTICAL);
+                                        element_container.setGravity(Gravity.CENTER_VERTICAL);
+                                        element_container.setOrientation(LinearLayout.HORIZONTAL);
+                                        element_container.setMinimumHeight(SimpleMenu.dpToPx(48, ctx));
 
-                                    // Контейнер интерактивного элемента
-                                    let widget_container = new LinearLayout(ctx);
-                                    widget_container.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1));
-                                    widget_container.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+                                        let element_shape = new android.graphics.drawable.GradientDrawable()
+                                        element_shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
 
-                                    switch (element_config.type) {
-                                        case "separator":
-                                            setSeparator(ctx, element_config, content_container);
-                                            break;
-                                        case "button":
-                                            setName(ctx, element_config, name_container, element_container);
-                                            createButton(ctx, element_config, widget_container, element_container, content_container, index);
-                                            break;
-                                        case "checkbox":
-                                            setName(ctx, element_config, name_container, element_container);
-                                            createCheckBox(ctx, element_config, widget_container, element_container, content_container, index);
-                                            break;
-                                        case "switch":
-                                            setName(ctx, element_config, name_container, element_container);
-                                            createSwitch(ctx, element_config, widget_container, element_container, content_container, index);
-                                            break;
-                                        case "selection":
-                                            setName(ctx, element_config, name_container, element_container);
-                                            createSelection(ctx, element_config, widget_container, element_container, content_container, index);
-                                            break;
-                                        case "multiselection":
-                                            setName(ctx, element_config, name_container, element_container);
-                                            createMultiSelection(ctx, element_config, widget_container, element_container, content_container, index);
-                                            break;
-                                        case "seekbar":
-                                            setName(ctx, element_config, name_container, element_container);
-                                            createSeekBar(ctx, element_config, widget_container, element_container, content_container, index)
-                                            break;
-                                        case "edittext":
-                                            setName(ctx, element_config, name_container, element_container);
-                                            createEditText(ctx, element_config, widget_container, element_container, content_container, index);
-                                            break;
-                                        default:
-                                            Logger.Log("[SimpleMenuAPI] show(): Unknown element '" + element_config.type + "'. Expected one of: " + Object.keys(SCHEMA.elements.properties).join(", "), "WARNING");
-                                    };
+                                        element_container.setBackground(setDrawable(ctx, element_shape, "single_element", 5, null,
+                                            config.drawing.cornerRadius - config.drawing.paddingHorizontal, null, null));
+
+                                        // Контейнер имени элемента
+                                        let name_container = new LinearLayout(ctx);
+                                        name_container.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 2));
+                                        name_container.setGravity(Gravity.CENTER_VERTICAL);
+
+                                        // Контейнер интерактивного элемента
+                                        let widget_container = new LinearLayout(ctx);
+                                        widget_container.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1));
+                                        widget_container.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+
+                                        renderElement(ctx, element_config, name_container, widget_container, element_container, content_container, element_shape, "single_element", null, element_index, element_config.type);
+
+                                    } else {
+                                        let section_container = new LinearLayout(ctx);
+                                        section_container.setOrientation(LinearLayout.VERTICAL);
+                                        section_container.setGravity(Gravity.CENTER);
+
+                                        let section_params = new LinearLayout.LayoutParams(
+                                            LayoutParams.MATCH_PARENT,
+                                            LayoutParams.WRAP_CONTENT
+                                        );
+
+                                        section_params.setMargins(0, 0, 0, SimpleMenu.dpToPx(config.drawing.paddingHorizontal/2, ctx));
+                                        section_container.setLayoutParams(section_params);
+
+                                        let section_shape = new android.graphics.drawable.GradientDrawable()
+                                        section_shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+
+                                        section_container.setBackground(setDrawable(ctx, section_shape, "section", 5, null,
+                                            config.drawing.cornerRadius - config.drawing.paddingHorizontal, null, null));
+                                        
+                                        if(element_config.subtitle !== null){
+                                            let textview = new TextView(ctx);
+                                            textview.setText(element_config.subtitle);
+                                            textview.setTextSize(TypedValue.COMPLEX_UNIT_SP, element_config.subtitleSize);
+                                            setTextColor(textview, element_config.subtitleColor, THEME_COLORS.accent);
+                                            let lp = new LinearLayout.LayoutParams(
+                                                LayoutParams.MATCH_PARENT,
+                                                LayoutParams.WRAP_CONTENT
+                                            );
+                                            lp.setMargins(padding, SimpleMenu.dpToPx(10, ctx), padding, SimpleMenu.dpToPx(5, ctx));
+                                            textview.setLayoutParams(lp);
+                                            textview.setEllipsize(TextUtils.TruncateAt.END);
+                                            textview.setMaxLines(2); 
+                                            textview.setGravity(ALIGNMENTS[element_config.subtitleAlignment]);
+
+                                            let customTypeface = android.graphics.Typeface.create(
+                                                android.graphics.Typeface.DEFAULT, // базовый шрифт
+                                                500,                               // числовой вес
+                                                false                              // не курсив
+                                            );
+                                            textview.setTypeface(customTypeface);
+
+                                            section_container.addView(textview);
+                                        };
+
+                                        for (let jndex = 0; jndex < target_config.elements[index].elements.length; jndex++){
+                                            let sectional_element_config = target_config.elements[index].elements[jndex];
+                                            element_index++;
+
+                                            // Контейнер элемента
+                                            let element_container = new LinearLayout(ctx);
+                                            element_container.setLayoutParams(new LinearLayout.LayoutParams(
+                                                LayoutParams.MATCH_PARENT,
+                                                LayoutParams.WRAP_CONTENT
+                                            ));
+                                            element_container.setGravity(Gravity.CENTER_VERTICAL);
+                                            element_container.setOrientation(LinearLayout.HORIZONTAL);
+                                            element_container.setMinimumHeight(SimpleMenu.dpToPx(48, ctx));
+
+
+                                            let element_shape = new android.graphics.drawable.GradientDrawable()
+                                            element_shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+
+                                            let element_side = null;
+                                            if (jndex === target_config.elements[index].elements.length - 1){
+                                                element_side = false;
+                                            } else if (jndex == 0 && target_config.elements[index].subtitle === null){
+                                                element_side = true;
+                                            }
+
+                                            let element_type = "section_element";
+                                            if(target_config.elements[index].elements.length === 1 && target_config.elements[index].subtitle === null) element_type = "single_element";
+                                        
+                                            element_container.setBackground(setDrawable(ctx, element_shape, element_type, 5, null,
+                                                config.drawing.cornerRadius - config.drawing.paddingHorizontal, element_side, null));
+
+                                            // Контейнер имени элемента
+                                            let name_container = new LinearLayout(ctx);
+                                            name_container.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 2));
+                                            name_container.setGravity(Gravity.CENTER_VERTICAL);
+
+                                            // Контейнер интерактивного элемента
+                                            let widget_container = new LinearLayout(ctx);
+                                            widget_container.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1));
+                                            widget_container.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+
+                                            renderElement(ctx, sectional_element_config, name_container, widget_container, element_container, section_container, element_shape, element_type, element_side, element_index, sectional_element_config.type);
+                                        };
+                                        content_container.addView(section_container);
+                                    }
                                 };
                                 
                                 let builder = new AlertDialog.Builder(ctx).setView(menu_container);
@@ -1482,3 +2119,5 @@ let SimpleMenu = {
 }
 
 EXPORT("SimpleMenu", SimpleMenu);
+EXPORT("AttributesReader", AttributesReader);
+EXPORT("ValuesCache ", ValuesCache );

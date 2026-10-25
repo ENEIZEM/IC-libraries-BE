@@ -7,6 +7,9 @@
         "skipLibCheck": true,
         "noEmit":true
     },
+    "exclude": [
+        "../../toolchain/declarations/ColorHelperLib.d.ts"
+    ],
     "include": [
         "**/*.js"
     ],
